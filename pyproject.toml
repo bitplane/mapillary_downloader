@@ -28,7 +28,7 @@ Repository = "https://github.com/bitplane/mapillary_downloader"
 Issues = "https://github.com/bitplane/mapillary_downloader/issues"
 
 [project.scripts]
-mapillary-download = "mapillary_downloader.__main__:main"
+mapillary-downloader = "mapillary_downloader.__main__:main"
 
 [project.optional-dependencies]
 dev = [

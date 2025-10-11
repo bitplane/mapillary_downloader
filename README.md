@@ -19,17 +19,19 @@ make install
 First, get your Mapillary API access token from https://www.mapillary.com/dashboard/developers
 
 ```bash
-mapillary-download --token YOUR_TOKEN --username YOUR_USERNAME --output ./downloads
+mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./downloads
 ```
 
-Options:
-- `--token`: Your Mapillary API access token (required)
-- `--username`: Your Mapillary username (required)
-- `--output`: Output directory (default: ./mapillary_data)
-- `--quality`: Image quality - 256, 1024, 2048, or original (default: original)
-- `--bbox`: Bounding box filter: west,south,east,north
+| option        | because                               | default            |
+| ------------- | ------------------------------------- | ------------------ |
+| `--token`     | Your Mapillary API access token       | None (required)    |
+| `--username`  | Your Mapillary username               | None (required)    |
+| `--output`    | Output directory                      | `./mapillary_data` |
+| `--quality`   | 256, 1024, 2048 or original           | `original`         |
+| `--bbox`      | `west,south,east,north`               | `None`             |
 
 The downloader will:
+
 * 💾 Fetch all your uploaded images from Mapillary
 - 📷 Download full-resolution images organized by sequence
 - 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps, compass direction)

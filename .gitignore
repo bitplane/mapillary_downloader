@@ -5,5 +5,5 @@ htmlcov
 dist
 coverage.json
 site
-downloads
+mapillary_data
 docs/pydoc
