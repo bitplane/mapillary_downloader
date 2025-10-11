@@ -31,9 +31,13 @@ class MapillaryDownloader:
         return set()
 
     def _save_progress(self):
-        """Save progress to disk."""
-        with open(self.progress_file, "w") as f:
+        """Save progress to disk atomically."""
+        temp_file = self.progress_file.with_suffix(".json.tmp")
+        with open(temp_file, "w") as f:
             json.dump({"downloaded": list(self.downloaded)}, f)
+            f.flush()
+            os.fsync(f.fileno())
+        temp_file.replace(self.progress_file)
 
     def download_user_data(self, username, quality="original", bbox=None):
         """Download all images for a user.
