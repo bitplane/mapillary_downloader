@@ -1,4 +1,4 @@
-# Mapillary Downloader
+# 🗺️ Mapillary Downloader
 
 Download your Mapillary data before it's gone.
 
