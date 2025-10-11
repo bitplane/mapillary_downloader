@@ -30,17 +30,10 @@ Options:
 - `--bbox`: Bounding box filter: west,south,east,north
 
 The downloader will:
-- Fetch all your uploaded images from Mapillary
-- Download full-resolution images organized by sequence
-- Inject EXIF metadata (GPS coordinates, camera info, timestamps, compass direction)
-- Save progress so you can safely resume if interrupted
-
-## Features
-
-- **Resume capability**: Interrupt and restart anytime - it tracks what's downloaded
-- **EXIF restoration**: Restores GPS, camera, and timestamp metadata that Mapillary stripped
-- **Atomic writes**: Progress tracking uses atomic file operations to prevent corruption
-- **Organized output**: Images organized by sequence ID with metadata in JSONL format
+* 💾 Fetch all your uploaded images from Mapillary
+- 📷 Download full-resolution images organized by sequence
+- 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps, compass direction)
+- 🛟 Save progress so you can safely resume if interrupted
 
 ## Development
 

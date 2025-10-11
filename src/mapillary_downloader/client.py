@@ -2,6 +2,7 @@
 
 import time
 import requests
+from requests.exceptions import RequestException
 
 
 class MapillaryClient:
@@ -66,8 +67,22 @@ class MapillaryClient:
         url = f"{self.base_url}/images"
 
         while url:
-            response = self.session.get(url, params=params)
-            response.raise_for_status()
+            max_retries = 10
+            base_delay = 1.0
+
+            for attempt in range(max_retries):
+                try:
+                    response = self.session.get(url, params=params)
+                    response.raise_for_status()
+                    break
+                except RequestException as e:
+                    if attempt == max_retries - 1:
+                        raise
+
+                    delay = base_delay * (2 ** attempt)
+                    print(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                    print(f"Retrying in {delay:.1f} seconds...")
+                    time.sleep(delay)
 
             data = response.json()
 
@@ -91,17 +106,27 @@ class MapillaryClient:
         Returns:
             Number of bytes downloaded if successful, 0 otherwise
         """
-        try:
-            response = self.session.get(image_url, stream=True)
-            response.raise_for_status()
+        max_retries = 10
+        base_delay = 1.0
 
-            total_bytes = 0
-            with open(output_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                    total_bytes += len(chunk)
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(image_url, stream=True)
+                response.raise_for_status()
 
-            return total_bytes
-        except Exception as e:
-            print(f"Error downloading {image_url}: {e}")
-            return 0
+                total_bytes = 0
+                with open(output_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                        total_bytes += len(chunk)
+
+                return total_bytes
+            except RequestException as e:
+                if attempt == max_retries - 1:
+                    print(f"Error downloading {image_url} after {max_retries} attempts: {e}")
+                    return 0
+
+                delay = base_delay * (2 ** attempt)
+                print(f"Download failed (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"Retrying in {delay:.1f} seconds...")
+                time.sleep(delay)
