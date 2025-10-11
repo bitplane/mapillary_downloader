@@ -16,9 +16,7 @@ class MapillaryClient:
         self.access_token = access_token
         self.base_url = "https://graph.mapillary.com"
         self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"OAuth {access_token}"
-        })
+        self.session.headers.update({"Authorization": f"OAuth {access_token}"})
 
     def get_user_images(self, username, bbox=None, limit=2000):
         """Get images uploaded by a specific user.
@@ -34,18 +32,32 @@ class MapillaryClient:
         params = {
             "creator_username": username,
             "limit": limit,
-            "fields": ",".join([
-                "id",
-                "captured_at",
-                "compass_angle",
-                "geometry",
-                "is_pano",
-                "sequence",
-                "thumb_256_url",
-                "thumb_1024_url",
-                "thumb_2048_url",
-                "thumb_original_url",
-            ])
+            "fields": ",".join(
+                [
+                    "id",
+                    "captured_at",
+                    "compass_angle",
+                    "computed_compass_angle",
+                    "geometry",
+                    "computed_geometry",
+                    "altitude",
+                    "computed_altitude",
+                    "is_pano",
+                    "sequence",
+                    "camera_type",
+                    "camera_parameters",
+                    "make",
+                    "model",
+                    "exif_orientation",
+                    "computed_rotation",
+                    "height",
+                    "width",
+                    "thumb_256_url",
+                    "thumb_1024_url",
+                    "thumb_2048_url",
+                    "thumb_original_url",
+                ]
+            ),
         }
 
         if bbox:
@@ -77,17 +89,19 @@ class MapillaryClient:
             output_path: Path to save the image
 
         Returns:
-            True if successful, False otherwise
+            Number of bytes downloaded if successful, 0 otherwise
         """
         try:
             response = self.session.get(image_url, stream=True)
             response.raise_for_status()
 
+            total_bytes = 0
             with open(output_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
+                    total_bytes += len(chunk)
 
-            return True
+            return total_bytes
         except Exception as e:
             print(f"Error downloading {image_url}: {e}")
-            return False
+            return 0

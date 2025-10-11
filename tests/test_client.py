@@ -95,7 +95,7 @@ def test_download_image_success(tmp_path):
     output_path = tmp_path / "test.jpg"
     result = client.download_image("http://example.com/image.jpg", output_path)
 
-    assert result is True
+    assert result == 15  # len(b"fake image data")
     assert output_path.exists()
     assert output_path.read_bytes() == image_data
 
@@ -109,7 +109,7 @@ def test_download_image_failure(tmp_path, capsys):
     output_path = tmp_path / "test.jpg"
     result = client.download_image("http://example.com/image.jpg", output_path)
 
-    assert result is False
+    assert result == 0
     assert not output_path.exists()
 
     captured = capsys.readouterr()

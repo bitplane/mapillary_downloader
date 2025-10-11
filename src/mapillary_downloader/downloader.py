@@ -3,6 +3,18 @@
 import json
 import os
 from pathlib import Path
+from mapillary_downloader.exif_writer import write_exif_to_image
+
+
+def format_bytes(bytes_count):
+    """Format bytes as human-readable string."""
+    if bytes_count < 1024:
+        return f"{bytes_count} B"
+    if bytes_count < 1024 * 1024:
+        return f"{bytes_count / 1024:.3f} KB"
+    if bytes_count < 1024 * 1024 * 1024:
+        return f"{bytes_count / (1024 * 1024):.3f} MB"
+    return f"{bytes_count / (1024 * 1024 * 1024):.3f} GB"
 
 
 class MapillaryDownloader:
@@ -56,6 +68,7 @@ class MapillaryDownloader:
         processed = 0
         downloaded_count = 0
         skipped = 0
+        total_bytes = 0
 
         with open(self.metadata_file, "a") as meta_f:
             for image in self.client.get_user_images(username, bbox=bbox):
@@ -86,14 +99,21 @@ class MapillaryDownloader:
 
                 output_path = img_dir / f"{image_id}.jpg"
 
-                if self.client.download_image(image_url, output_path):
+                bytes_downloaded = self.client.download_image(image_url, output_path)
+                if bytes_downloaded:
+                    # Write EXIF metadata to the downloaded image
+                    write_exif_to_image(output_path, image)
+
                     self.downloaded.add(image_id)
                     downloaded_count += 1
-                    print(f"Processed: {processed}, Downloaded: {downloaded_count}")
+                    total_bytes += bytes_downloaded
+                    print(f"Processed: {processed}, Downloaded: {downloaded_count} ({format_bytes(total_bytes)})")
 
                     # Save progress every 10 images
                     if downloaded_count % 10 == 0:
                         self._save_progress()
 
         self._save_progress()
-        print(f"\nComplete! Processed {processed} images, downloaded {downloaded_count}, skipped {skipped}")
+        print(
+            f"\nComplete! Processed {processed} images, downloaded {downloaded_count} ({format_bytes(total_bytes)}), skipped {skipped}"
+        )

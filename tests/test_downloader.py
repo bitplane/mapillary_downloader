@@ -1,7 +1,7 @@
 """Tests for the downloader."""
 
 import json
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from mapillary_downloader.downloader import MapillaryDownloader
 
 
@@ -55,7 +55,8 @@ def test_save_progress(tmp_path):
     assert "img1" in data["downloaded"]
 
 
-def test_download_user_data(tmp_path, capsys):
+@patch("mapillary_downloader.downloader.write_exif_to_image")
+def test_download_user_data(mock_write_exif, tmp_path, capsys):
     """Test downloading user data."""
     mock_client = Mock()
 
@@ -75,7 +76,8 @@ def test_download_user_data(tmp_path, capsys):
     ]
 
     mock_client.get_user_images = Mock(return_value=iter(images))
-    mock_client.download_image = Mock(return_value=True)
+    mock_client.download_image = Mock(return_value=100)
+    mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
     downloader.download_user_data("testuser")
@@ -85,20 +87,23 @@ def test_download_user_data(tmp_path, capsys):
     assert "img2" in downloader.downloaded
 
     assert mock_client.download_image.call_count == 2
+    assert mock_write_exif.call_count == 2
 
     assert (tmp_path / "metadata.jsonl").exists()
     metadata_lines = (tmp_path / "metadata.jsonl").read_text().strip().split("\n")
     assert len(metadata_lines) == 2
 
 
-def test_download_user_data_with_sequence_organization(tmp_path):
+@patch("mapillary_downloader.downloader.write_exif_to_image")
+def test_download_user_data_with_sequence_organization(mock_write_exif, tmp_path):
     """Test that images are organized by sequence."""
     mock_client = Mock()
 
     images = [{"id": "img1", "sequence": "seq1", "thumb_original_url": "http://example.com/img1.jpg"}]
 
     mock_client.get_user_images = Mock(return_value=iter(images))
-    mock_client.download_image = Mock(return_value=True)
+    mock_client.download_image = Mock(return_value=100)
+    mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
     downloader.download_user_data("testuser")
@@ -110,7 +115,8 @@ def test_download_user_data_with_sequence_organization(tmp_path):
     assert str(call_args[1]).endswith("seq1/img1.jpg")
 
 
-def test_download_user_data_skip_existing(tmp_path):
+@patch("mapillary_downloader.downloader.write_exif_to_image")
+def test_download_user_data_skip_existing(mock_write_exif, tmp_path):
     """Test that existing downloads are skipped."""
     mock_client = Mock()
 
@@ -120,7 +126,8 @@ def test_download_user_data_skip_existing(tmp_path):
     ]
 
     mock_client.get_user_images = Mock(return_value=iter(images))
-    mock_client.download_image = Mock(return_value=True)
+    mock_client.download_image = Mock(return_value=100)
+    mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
     downloader.downloaded.add("img1")
@@ -132,7 +139,8 @@ def test_download_user_data_skip_existing(tmp_path):
     assert "img2.jpg" in str(call_args[1])
 
 
-def test_download_user_data_quality_selection(tmp_path):
+@patch("mapillary_downloader.downloader.write_exif_to_image")
+def test_download_user_data_quality_selection(mock_write_exif, tmp_path):
     """Test that quality parameter selects correct URL field."""
     mock_client = Mock()
 
@@ -147,7 +155,8 @@ def test_download_user_data_quality_selection(tmp_path):
     ]
 
     mock_client.get_user_images = Mock(return_value=iter(images))
-    mock_client.download_image = Mock(return_value=True)
+    mock_client.download_image = Mock(return_value=100)
+    mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
     downloader.download_user_data("testuser", quality="1024")

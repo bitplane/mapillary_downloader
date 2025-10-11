@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "requests>=2.31.0",
+    "piexif>=1.1.3",
 ]
 
 [project.optional-dependencies]
@@ -23,7 +24,8 @@ dev = [
     "ruff",
     "mkdocs",
     "mkdocs-material",
-    "pydoc-markdown"
+    "pydoc-markdown",
+    "Pillow",
 ]
 
 [build-system]
