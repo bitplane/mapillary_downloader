@@ -1,0 +1,93 @@
+"""Mapillary API client."""
+
+import time
+import requests
+
+
+class MapillaryClient:
+    """Client for interacting with Mapillary API v4."""
+
+    def __init__(self, access_token):
+        """Initialize the client with an access token.
+
+        Args:
+            access_token: Mapillary API access token
+        """
+        self.access_token = access_token
+        self.base_url = "https://graph.mapillary.com"
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"OAuth {access_token}"
+        })
+
+    def get_user_images(self, username, bbox=None, limit=2000):
+        """Get images uploaded by a specific user.
+
+        Args:
+            username: Mapillary username
+            bbox: Optional bounding box [west, south, east, north]
+            limit: Number of results per page (max 2000)
+
+        Yields:
+            Image data dictionaries
+        """
+        params = {
+            "creator_username": username,
+            "limit": limit,
+            "fields": ",".join([
+                "id",
+                "captured_at",
+                "compass_angle",
+                "geometry",
+                "is_pano",
+                "sequence",
+                "thumb_256_url",
+                "thumb_1024_url",
+                "thumb_2048_url",
+                "thumb_original_url",
+            ])
+        }
+
+        if bbox:
+            params["bbox"] = ",".join(map(str, bbox))
+
+        url = f"{self.base_url}/images"
+
+        while url:
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+
+            for image in data.get("data", []):
+                yield image
+
+            # Get next page URL
+            url = data.get("paging", {}).get("next")
+            params = None  # Don't send params on subsequent requests, URL has them
+
+            # Rate limiting: 10,000 requests/minute for search API
+            time.sleep(0.01)
+
+    def download_image(self, image_url, output_path):
+        """Download an image from a URL.
+
+        Args:
+            image_url: URL of the image to download
+            output_path: Path to save the image
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            response = self.session.get(image_url, stream=True)
+            response.raise_for_status()
+
+            with open(output_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            return True
+        except Exception as e:
+            print(f"Error downloading {image_url}: {e}")
+            return False
