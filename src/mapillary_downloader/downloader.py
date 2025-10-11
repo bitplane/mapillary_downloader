@@ -53,13 +53,14 @@ class MapillaryDownloader:
         print(f"Output directory: {self.output_dir}")
         print(f"Quality: {quality}")
 
-        total = 0
+        processed = 0
+        downloaded_count = 0
         skipped = 0
 
         with open(self.metadata_file, "a") as meta_f:
             for image in self.client.get_user_images(username, bbox=bbox):
                 image_id = image["id"]
-                total += 1
+                processed += 1
 
                 if image_id in self.downloaded:
                     skipped += 1
@@ -87,11 +88,12 @@ class MapillaryDownloader:
 
                 if self.client.download_image(image_url, output_path):
                     self.downloaded.add(image_id)
-                    print(f"Downloaded {total}: {image_id}")
+                    downloaded_count += 1
+                    print(f"Processed: {processed}, Downloaded: {downloaded_count}")
 
                     # Save progress every 10 images
-                    if len(self.downloaded) % 10 == 0:
+                    if downloaded_count % 10 == 0:
                         self._save_progress()
 
         self._save_progress()
-        print(f"\nComplete! Downloaded {len(self.downloaded)} images (skipped {skipped} existing)")
+        print(f"\nComplete! Processed {processed} images, downloaded {downloaded_count}, skipped {skipped}")
