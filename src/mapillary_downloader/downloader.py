@@ -1,20 +1,15 @@
 """Main downloader logic."""
 
 import json
+import logging
 import os
+import time
 from pathlib import Path
+from collections import deque
 from mapillary_downloader.exif_writer import write_exif_to_image
+from mapillary_downloader.utils import format_size, format_time
 
-
-def format_bytes(bytes_count):
-    """Format bytes as human-readable string."""
-    if bytes_count < 1024:
-        return f"{bytes_count} B"
-    if bytes_count < 1024 * 1024:
-        return f"{bytes_count / 1024:.3f} KB"
-    if bytes_count < 1024 * 1024 * 1024:
-        return f"{bytes_count / (1024 * 1024):.3f} MB"
-    return f"{bytes_count / (1024 * 1024 * 1024):.3f} GB"
+logger = logging.getLogger("mapillary_downloader")
 
 
 class MapillaryDownloader:
@@ -61,32 +56,98 @@ class MapillaryDownloader:
         """
         quality_field = f"thumb_{quality}_url"
 
-        print(f"Downloading images for user: {username}")
-        print(f"Output directory: {self.output_dir}")
-        print(f"Quality: {quality}")
+        logger.info(f"Downloading images for user: {username}")
+        logger.info(f"Output directory: {self.output_dir}")
+        logger.info(f"Quality: {quality}")
 
         processed = 0
         downloaded_count = 0
         skipped = 0
         total_bytes = 0
 
+        # Track download times for adaptive ETA (last 50 downloads)
+        download_times = deque(maxlen=50)
+        start_time = time.time()
+
+        # Track which image IDs we've seen in metadata to avoid re-fetching
+        seen_ids = set()
+
+        # First, process any existing metadata without re-fetching from API
+        if self.metadata_file.exists():
+            logger.info("Processing existing metadata file...")
+            with open(self.metadata_file) as f:
+                for line in f:
+                    if line.strip():
+                        image = json.loads(line)
+                        image_id = image["id"]
+                        seen_ids.add(image_id)
+                        processed += 1
+
+                        if image_id in self.downloaded:
+                            skipped += 1
+                            continue
+
+                        # Download this un-downloaded image
+                        image_url = image.get(quality_field)
+                        if not image_url:
+                            logger.warning(f"No {quality} URL for image {image_id}")
+                            continue
+
+                        sequence_id = image.get("sequence")
+                        if sequence_id:
+                            img_dir = self.output_dir / sequence_id
+                            img_dir.mkdir(exist_ok=True)
+                        else:
+                            img_dir = self.output_dir
+
+                        output_path = img_dir / f"{image_id}.jpg"
+
+                        download_start = time.time()
+                        bytes_downloaded = self.client.download_image(image_url, output_path)
+                        if bytes_downloaded:
+                            download_time = time.time() - download_start
+                            download_times.append(download_time)
+
+                            write_exif_to_image(output_path, image)
+
+                            self.downloaded.add(image_id)
+                            downloaded_count += 1
+                            total_bytes += bytes_downloaded
+
+                            progress_str = (
+                                f"Processed: {processed}, Downloaded: {downloaded_count} ({format_size(total_bytes)})"
+                            )
+                            logger.info(progress_str)
+
+                            if downloaded_count % 10 == 0:
+                                self._save_progress()
+
+        # Always check API for new images (will skip duplicates via seen_ids)
+        logger.info("Checking for new images from API...")
         with open(self.metadata_file, "a") as meta_f:
             for image in self.client.get_user_images(username, bbox=bbox):
                 image_id = image["id"]
+
+                # Skip if we already have this in our metadata file
+                if image_id in seen_ids:
+                    continue
+
+                seen_ids.add(image_id)
                 processed += 1
 
+                # Save new metadata
+                meta_f.write(json.dumps(image) + "\n")
+                meta_f.flush()
+
+                # Skip if already downloaded
                 if image_id in self.downloaded:
                     skipped += 1
                     continue
 
-                # Save metadata
-                meta_f.write(json.dumps(image) + "\n")
-                meta_f.flush()
-
                 # Download image
                 image_url = image.get(quality_field)
                 if not image_url:
-                    print(f"No {quality} URL for image {image_id}")
+                    logger.warning(f"No {quality} URL for image {image_id}")
                     continue
 
                 # Use sequence ID for organization
@@ -99,21 +160,33 @@ class MapillaryDownloader:
 
                 output_path = img_dir / f"{image_id}.jpg"
 
+                download_start = time.time()
                 bytes_downloaded = self.client.download_image(image_url, output_path)
                 if bytes_downloaded:
+                    download_time = time.time() - download_start
+                    download_times.append(download_time)
+
                     # Write EXIF metadata to the downloaded image
                     write_exif_to_image(output_path, image)
 
                     self.downloaded.add(image_id)
                     downloaded_count += 1
                     total_bytes += bytes_downloaded
-                    print(f"Processed: {processed}, Downloaded: {downloaded_count} ({format_bytes(total_bytes)})")
+
+                    # Calculate progress
+                    progress_str = (
+                        f"Processed: {processed}, Downloaded: {downloaded_count} ({format_size(total_bytes)})"
+                    )
+
+                    logger.info(progress_str)
 
                     # Save progress every 10 images
                     if downloaded_count % 10 == 0:
                         self._save_progress()
 
         self._save_progress()
-        print(
-            f"\nComplete! Processed {processed} images, downloaded {downloaded_count} ({format_bytes(total_bytes)}), skipped {skipped}"
+        elapsed = time.time() - start_time
+        logger.info(
+            f"Complete! Processed {processed} images, downloaded {downloaded_count} ({format_size(total_bytes)}), skipped {skipped}"
         )
+        logger.info(f"Total time: {format_time(elapsed)}")

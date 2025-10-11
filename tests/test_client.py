@@ -101,7 +101,7 @@ def test_download_image_success(tmp_path):
     assert output_path.read_bytes() == image_data
 
 
-def test_download_image_failure(tmp_path, capsys):
+def test_download_image_failure(tmp_path, caplog):
     """Test failed image download."""
     client = MapillaryClient("test_token")
 
@@ -114,5 +114,4 @@ def test_download_image_failure(tmp_path, capsys):
     assert result == 0
     assert not output_path.exists()
 
-    captured = capsys.readouterr()
-    assert "Error downloading" in captured.out
+    assert "Error downloading" in caplog.text

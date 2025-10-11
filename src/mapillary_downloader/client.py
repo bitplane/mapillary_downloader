@@ -1,8 +1,11 @@
 """Mapillary API client."""
 
+import logging
 import time
 import requests
 from requests.exceptions import RequestException
+
+logger = logging.getLogger("mapillary_downloader")
 
 
 class MapillaryClient:
@@ -65,6 +68,7 @@ class MapillaryClient:
             params["bbox"] = ",".join(map(str, bbox))
 
         url = f"{self.base_url}/images"
+        total_fetched = 0
 
         while url:
             max_retries = 10
@@ -79,14 +83,17 @@ class MapillaryClient:
                     if attempt == max_retries - 1:
                         raise
 
-                    delay = base_delay * (2 ** attempt)
-                    print(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
-                    print(f"Retrying in {delay:.1f} seconds...")
+                    delay = base_delay * (2**attempt)
+                    logger.warning(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                    logger.info(f"Retrying in {delay:.1f} seconds...")
                     time.sleep(delay)
 
             data = response.json()
+            images = data.get("data", [])
+            total_fetched += len(images)
+            logger.info(f"Fetched metadata for {total_fetched:,} images...")
 
-            for image in data.get("data", []):
+            for image in images:
                 yield image
 
             # Get next page URL
@@ -123,10 +130,10 @@ class MapillaryClient:
                 return total_bytes
             except RequestException as e:
                 if attempt == max_retries - 1:
-                    print(f"Error downloading {image_url} after {max_retries} attempts: {e}")
+                    logger.error(f"Error downloading {image_url} after {max_retries} attempts: {e}")
                     return 0
 
-                delay = base_delay * (2 ** attempt)
-                print(f"Download failed (attempt {attempt + 1}/{max_retries}): {e}")
-                print(f"Retrying in {delay:.1f} seconds...")
+                delay = base_delay * (2**attempt)
+                logger.warning(f"Download failed (attempt {attempt + 1}/{max_retries}): {e}")
+                logger.info(f"Retrying in {delay:.1f} seconds...")
                 time.sleep(delay)

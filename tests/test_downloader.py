@@ -77,6 +77,7 @@ def test_download_user_data(mock_write_exif, tmp_path, capsys):
 
     mock_client.get_user_images = Mock(return_value=iter(images))
     mock_client.download_image = Mock(return_value=100)
+    mock_client.get_total_count = Mock(return_value=None)
     mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
@@ -103,6 +104,7 @@ def test_download_user_data_with_sequence_organization(mock_write_exif, tmp_path
 
     mock_client.get_user_images = Mock(return_value=iter(images))
     mock_client.download_image = Mock(return_value=100)
+    mock_client.get_total_count = Mock(return_value=None)
     mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
@@ -127,6 +129,7 @@ def test_download_user_data_skip_existing(mock_write_exif, tmp_path):
 
     mock_client.get_user_images = Mock(return_value=iter(images))
     mock_client.download_image = Mock(return_value=100)
+    mock_client.get_total_count = Mock(return_value=None)
     mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
@@ -156,6 +159,7 @@ def test_download_user_data_quality_selection(mock_write_exif, tmp_path):
 
     mock_client.get_user_images = Mock(return_value=iter(images))
     mock_client.download_image = Mock(return_value=100)
+    mock_client.get_total_count = Mock(return_value=None)
     mock_write_exif.return_value = True
 
     downloader = MapillaryDownloader(mock_client, tmp_path)
