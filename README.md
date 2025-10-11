@@ -33,9 +33,10 @@ mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./down
 The downloader will:
 
 * 💾 Fetch all your uploaded images from Mapillary
-- 📷 Download full-resolution images organized by sequence
-- 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps, compass direction)
-- 🛟 Save progress so you can safely resume if interrupted
+* 📷 Download full-resolution images organized by sequence
+* 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps,
+  compass direction)
+* 🛟 Save progress so you can safely resume if interrupted
 
 ## Development
 
@@ -58,4 +59,5 @@ WTFPL with one additional clause
 
 1. Don't blame me
 
-Do wtf you want, but don't blame me when it breaks.
+Do wtf you want, but don't blame me if it makes jokes about the size of your
+disk drive.
