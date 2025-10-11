@@ -76,7 +76,7 @@ class MapillaryClient:
 
             for attempt in range(max_retries):
                 try:
-                    response = self.session.get(url, params=params)
+                    response = self.session.get(url, params=params, timeout=60)
                     response.raise_for_status()
                     break
                 except RequestException as e:
@@ -118,7 +118,7 @@ class MapillaryClient:
 
         for attempt in range(max_retries):
             try:
-                response = self.session.get(image_url, stream=True)
+                response = self.session.get(image_url, stream=True, timeout=60)
                 response.raise_for_status()
 
                 total_bytes = 0
