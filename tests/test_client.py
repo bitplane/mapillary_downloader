@@ -1,6 +1,7 @@
 """Tests for the Mapillary API client."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from requests.exceptions import RequestException
 from mapillary_downloader.client import MapillaryClient
 
 
@@ -104,10 +105,11 @@ def test_download_image_failure(tmp_path, capsys):
     """Test failed image download."""
     client = MapillaryClient("test_token")
 
-    client.session.get = Mock(side_effect=Exception("Network error"))
+    client.session.get = Mock(side_effect=RequestException("Network error"))
 
     output_path = tmp_path / "test.jpg"
-    result = client.download_image("http://example.com/image.jpg", output_path)
+    with patch("time.sleep"):
+        result = client.download_image("http://example.com/image.jpg", output_path)
 
     assert result == 0
     assert not output_path.exists()
