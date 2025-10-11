@@ -1,7 +1,7 @@
 [project]
 name = "mapillary_downloader"
 description = "Download your Mapillary data before it's gone"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
 ]
@@ -13,6 +13,15 @@ dependencies = [
     "piexif>=1.1.3",
 ]
 
+[project.urls]
+Homepage = "https://bitplane.net/dev/python/mapillary_downloader"
+Documentation = "https://bitplane.net/dev/python/mapillary_downloader/pydoc"
+Repository = "https://github.com/bitplane/mapillary_downloader"
+Issues = "https://github.com/bitplane/mapillary_downloader/issues"
+
+[project.scripts]
+mapillary-download = "mapillary_downloader.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pre-commit",
@@ -22,8 +31,6 @@ dev = [
     "build",
     "twine",
     "ruff",
-    "mkdocs",
-    "mkdocs-material",
     "pydoc-markdown",
     "Pillow",
 ]
