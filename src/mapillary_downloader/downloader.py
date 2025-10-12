@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -15,6 +16,23 @@ from mapillary_downloader.logging_config import add_file_handler
 logger = logging.getLogger("mapillary_downloader")
 
 
+def get_cache_dir():
+    """Get XDG cache directory for staging downloads.
+
+    Returns:
+        Path to cache directory for mapillary_downloader
+    """
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache:
+        cache_dir = Path(xdg_cache)
+    else:
+        cache_dir = Path.home() / ".cache"
+
+    mapillary_cache = cache_dir / "mapillary_downloader"
+    mapillary_cache.mkdir(parents=True, exist_ok=True)
+    return mapillary_cache
+
+
 class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 
@@ -25,7 +43,7 @@ class MapillaryDownloader:
 
         Args:
             client: MapillaryClient instance
-            output_dir: Base directory to save downloads
+            output_dir: Base directory to save downloads (final destination)
             username: Mapillary username (for collection directory)
             quality: Image quality (for collection directory)
             workers: Number of parallel workers (default: half of cpu_count)
@@ -40,16 +58,29 @@ class MapillaryDownloader:
         self.tar_sequences = tar_sequences
         self.convert_webp = convert_webp
 
-        # If username and quality provided, create collection directory
+        # Determine collection name
         if username and quality:
             collection_name = f"mapillary-{username}-{quality}"
             if convert_webp:
                 collection_name += "-webp"
-            self.output_dir = self.base_output_dir / collection_name
         else:
-            self.output_dir = self.base_output_dir
+            collection_name = None
 
+        # Set up staging directory in cache
+        cache_dir = get_cache_dir()
+        if collection_name:
+            self.staging_dir = cache_dir / collection_name
+            self.final_dir = self.base_output_dir / collection_name
+        else:
+            self.staging_dir = cache_dir / "download"
+            self.final_dir = self.base_output_dir
+
+        # Work in staging directory during download
+        self.output_dir = self.staging_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Staging directory: {self.staging_dir}")
+        logger.info(f"Final destination: {self.final_dir}")
 
         # Set up file logging for archival
         log_file = self.output_dir / "download.log"
@@ -85,6 +116,11 @@ class MapillaryDownloader:
         """
         if not self.username or not self.quality:
             raise ValueError("Username and quality must be provided during initialization")
+
+        # Check if collection already exists in final destination
+        if self.final_dir.exists():
+            logger.info(f"Collection already exists at {self.final_dir}, skipping download")
+            return
 
         quality_field = f"thumb_{self.quality}_url"
 
@@ -182,6 +218,16 @@ class MapillaryDownloader:
 
         # Generate IA metadata
         generate_ia_metadata(self.output_dir)
+
+        # Move from staging to final destination
+        logger.info("Moving collection from staging to final destination...")
+        if self.final_dir.exists():
+            logger.warning(f"Destination already exists, removing: {self.final_dir}")
+            shutil.rmtree(self.final_dir)
+
+        self.final_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(self.staging_dir), str(self.final_dir))
+        logger.info(f"Collection moved to: {self.final_dir}")
 
     def _download_images_parallel(self, images, convert_webp):
         """Download images in parallel using worker pool.

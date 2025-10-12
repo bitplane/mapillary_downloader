@@ -8,57 +8,68 @@ from mapillary_downloader.downloader import MapillaryDownloader
 def test_downloader_init(tmp_path):
     """Test downloader initialization."""
     mock_client = Mock()
-    downloader = MapillaryDownloader(mock_client, tmp_path)
+    # Mock get_cache_dir to use tmp_path for testing
+    with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path):
+        downloader = MapillaryDownloader(mock_client, tmp_path)
 
-    assert downloader.client == mock_client
-    assert downloader.output_dir == tmp_path
-    assert tmp_path.exists()
-    assert downloader.metadata_file == tmp_path / "metadata.jsonl"
-    assert downloader.progress_file == tmp_path / "progress.json"
+        assert downloader.client == mock_client
+        assert downloader.staging_dir == tmp_path / "download"
+        assert downloader.final_dir == tmp_path
+        assert downloader.output_dir == downloader.staging_dir
+        assert downloader.staging_dir.exists()
+        assert downloader.metadata_file == downloader.staging_dir / "metadata.jsonl"
+        assert downloader.progress_file == downloader.staging_dir / "progress.json"
 
 
 def test_load_progress_empty(tmp_path):
     """Test loading progress when no progress file exists."""
     mock_client = Mock()
-    downloader = MapillaryDownloader(mock_client, tmp_path)
+    with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path):
+        downloader = MapillaryDownloader(mock_client, tmp_path)
 
-    assert len(downloader.downloaded) == 0
+        assert len(downloader.downloaded) == 0
 
 
 def test_load_progress_existing(tmp_path):
     """Test loading progress from existing file."""
-    progress_file = tmp_path / "progress.json"
+    staging_dir = tmp_path / "download"
+    staging_dir.mkdir()
+    progress_file = staging_dir / "progress.json"
     progress_file.write_text(json.dumps({"downloaded": ["img1", "img2"]}))
 
     mock_client = Mock()
-    downloader = MapillaryDownloader(mock_client, tmp_path)
+    with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path):
+        downloader = MapillaryDownloader(mock_client, tmp_path)
 
-    assert len(downloader.downloaded) == 2
-    assert "img1" in downloader.downloaded
-    assert "img2" in downloader.downloaded
+        assert len(downloader.downloaded) == 2
+        assert "img1" in downloader.downloaded
+        assert "img2" in downloader.downloaded
 
 
 def test_save_progress(tmp_path):
     """Test saving progress."""
     mock_client = Mock()
-    downloader = MapillaryDownloader(mock_client, tmp_path)
+    with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path):
+        downloader = MapillaryDownloader(mock_client, tmp_path)
 
-    downloader.downloaded.add("img1")
-    downloader.downloaded.add("img2")
-    downloader._save_progress()
+        downloader.downloaded.add("img1")
+        downloader.downloaded.add("img2")
+        downloader._save_progress()
 
-    progress_file = tmp_path / "progress.json"
-    assert progress_file.exists()
+        progress_file = downloader.staging_dir / "progress.json"
+        assert progress_file.exists()
 
-    data = json.loads(progress_file.read_text())
-    assert len(data["downloaded"]) == 2
-    assert "img1" in data["downloaded"]
+        data = json.loads(progress_file.read_text())
+        assert len(data["downloaded"]) == 2
+        assert "img1" in data["downloaded"]
 
 
 @patch("mapillary_downloader.downloader.generate_ia_metadata")
 @patch("mapillary_downloader.downloader.tar_sequence_directories")
-def test_download_user_data(mock_tar, mock_ia_meta, tmp_path, capsys):
+@patch("mapillary_downloader.downloader.get_cache_dir")
+def test_download_user_data(mock_cache, mock_tar, mock_ia_meta, tmp_path, capsys):
     """Test downloading user data."""
+    mock_cache.return_value = tmp_path / "cache"
     mock_client = Mock()
     mock_client.access_token = "test_token"
 
@@ -90,6 +101,7 @@ def test_download_user_data(mock_tar, mock_ia_meta, tmp_path, capsys):
     assert mock_tar.call_count == 1
     assert mock_ia_meta.call_count == 1
 
+    # Check that metadata was created in staging and moved to final
     assert (tmp_path / "mapillary-testuser-original" / "metadata.jsonl").exists()
     metadata_lines = (tmp_path / "mapillary-testuser-original" / "metadata.jsonl").read_text().strip().split("\n")
     assert len(metadata_lines) == 2
@@ -97,8 +109,10 @@ def test_download_user_data(mock_tar, mock_ia_meta, tmp_path, capsys):
 
 @patch("mapillary_downloader.downloader.generate_ia_metadata")
 @patch("mapillary_downloader.downloader.tar_sequence_directories")
-def test_download_user_data_with_sequence_organization(mock_tar, mock_ia_meta, tmp_path):
+@patch("mapillary_downloader.downloader.get_cache_dir")
+def test_download_user_data_with_sequence_organization(mock_cache, mock_tar, mock_ia_meta, tmp_path):
     """Test that images are organized by sequence."""
+    mock_cache.return_value = tmp_path / "cache"
     mock_client = Mock()
     mock_client.access_token = "test_token"
 
@@ -111,15 +125,17 @@ def test_download_user_data_with_sequence_organization(mock_tar, mock_ia_meta, t
 
     downloader.download_user_data()
 
-    # Collection directory should be created
+    # Collection directory should be created in final destination
     assert (tmp_path / "mapillary-testuser-original").exists()
     assert downloader._download_images_parallel.call_count == 1
 
 
 @patch("mapillary_downloader.downloader.generate_ia_metadata")
 @patch("mapillary_downloader.downloader.tar_sequence_directories")
-def test_download_user_data_skip_existing(mock_tar, mock_ia_meta, tmp_path):
+@patch("mapillary_downloader.downloader.get_cache_dir")
+def test_download_user_data_skip_existing(mock_cache, mock_tar, mock_ia_meta, tmp_path):
     """Test that existing downloads are skipped."""
+    mock_cache.return_value = tmp_path / "cache"
     mock_client = Mock()
     mock_client.access_token = "test_token"
 
@@ -151,8 +167,10 @@ def test_download_user_data_skip_existing(mock_tar, mock_ia_meta, tmp_path):
 
 @patch("mapillary_downloader.downloader.generate_ia_metadata")
 @patch("mapillary_downloader.downloader.tar_sequence_directories")
-def test_download_user_data_quality_selection(mock_tar, mock_ia_meta, tmp_path):
+@patch("mapillary_downloader.downloader.get_cache_dir")
+def test_download_user_data_quality_selection(mock_cache, mock_tar, mock_ia_meta, tmp_path):
     """Test that quality parameter selects correct URL field."""
+    mock_cache.return_value = tmp_path / "cache"
     mock_client = Mock()
     mock_client.access_token = "test_token"
 
