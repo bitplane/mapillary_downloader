@@ -29,7 +29,7 @@ mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./down
 | `--output`    | Output directory                      | `./mapillary_data` |
 | `--quality`   | 256, 1024, 2048 or original           | `original`         |
 | `--bbox`      | `west,south,east,north`               | `None`             |
-| `--webp`      | Convert to WebP (saves ~83% space)    | `False`            |
+| `--webp`      | Convert to WebP (saves ~70% space)    | `False`            |
 
 The downloader will:
 
@@ -48,7 +48,7 @@ Use the `--webp` flag to convert images to WebP format after download:
 mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --webp
 ```
 
-This reduces storage by approximately 83% while preserving all EXIF metadata
+This reduces storage by approximately 70% while preserving all EXIF metadata
 including GPS coordinates. Requires the `cwebp` binary to be installed:
 
 ```bash

@@ -27,7 +27,7 @@ def main():
     parser.add_argument(
         "--webp",
         action="store_true",
-        help="Convert images to WebP format (saves ~83%% disk space, requires cwebp binary)",
+        help="Convert images to WebP format (saves ~70%% disk space, requires cwebp binary)",
     )
 
     args = parser.parse_args()

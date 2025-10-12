@@ -39,6 +39,7 @@ echo
 CONVERTED=0
 FAILED=0
 SAVED_BYTES=0
+TOTAL_ORIGINAL_BYTES=0
 
 # Find all JPEGs and convert them
 while read -r jpg; do
@@ -46,6 +47,7 @@ while read -r jpg; do
 
     # Get original size
     ORIGINAL_SIZE=$(stat -c%s "$jpg")
+    TOTAL_ORIGINAL_BYTES=$((TOTAL_ORIGINAL_BYTES + ORIGINAL_SIZE))
 
     # Convert with metadata preservation
     if cwebp -metadata all "$jpg" -o "$webp" >/dev/null 2>&1; then
@@ -62,7 +64,9 @@ while read -r jpg; do
         # Print progress every 10 files
         if [ $((CONVERTED % 10)) -eq 0 ]; then
             SAVED_MB=$((SAVED_BYTES / 1048576))
-            echo "Converted: $CONVERTED/$TOTAL (saved ${SAVED_MB}MB so far)"
+            PERCENTAGE=$((SAVED_BYTES * 100 / TOTAL_ORIGINAL_BYTES))
+            PROGRESS_PCT=$((CONVERTED * 100 / TOTAL))
+            echo "Progress: ${PROGRESS_PCT}% ($CONVERTED/$TOTAL) | Space reduction: ${PERCENTAGE}% (saved ${SAVED_MB}MB so far)"
         fi
     else
         FAILED=$((FAILED + 1))
@@ -75,9 +79,6 @@ done < <(find "$DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" \))
 # Final summary
 SAVED_MB=$((SAVED_BYTES / 1048576))
 SAVED_GB=$((SAVED_BYTES / 1073741824))
-
-# Calculate total original size and percentage saved
-TOTAL_ORIGINAL_BYTES=$((SAVED_BYTES + $(find "$DIR" -type f -iname "*.webp" -exec stat -c%s {} + | awk '{sum+=$1} END {print sum}')))
 
 if [ "$TOTAL_ORIGINAL_BYTES" -gt 0 ]; then
     PERCENTAGE=$((SAVED_BYTES * 100 / TOTAL_ORIGINAL_BYTES))
