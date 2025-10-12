@@ -14,12 +14,12 @@ def parse_collection_name(directory):
     """Parse username and quality from directory name.
 
     Args:
-        directory: Path to collection directory (e.g., mapillary-username-original)
+        directory: Path to collection directory (e.g., mapillary-username-original or mapillary-username-original-webp)
 
     Returns:
         Tuple of (username, quality) or (None, None) if parsing fails
     """
-    match = re.match(r"mapillary-(.+)-(256|1024|2048|original)$", Path(directory).name)
+    match = re.match(r"mapillary-(.+)-(256|1024|2048|original)(?:-webp)?$", Path(directory).name)
     if match:
         return match.group(1), match.group(2)
     return None, None

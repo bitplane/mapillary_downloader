@@ -18,7 +18,9 @@ logger = logging.getLogger("mapillary_downloader")
 class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 
-    def __init__(self, client, output_dir, username=None, quality=None, workers=None, tar_sequences=True):
+    def __init__(
+        self, client, output_dir, username=None, quality=None, workers=None, tar_sequences=True, convert_webp=False
+    ):
         """Initialize the downloader.
 
         Args:
@@ -28,6 +30,7 @@ class MapillaryDownloader:
             quality: Image quality (for collection directory)
             workers: Number of parallel workers (default: half of cpu_count)
             tar_sequences: Whether to tar sequence directories after download (default: True)
+            convert_webp: Whether to convert images to WebP (affects collection name)
         """
         self.client = client
         self.base_output_dir = Path(output_dir)
@@ -35,10 +38,13 @@ class MapillaryDownloader:
         self.quality = quality
         self.workers = workers if workers is not None else max(1, os.cpu_count() // 2)
         self.tar_sequences = tar_sequences
+        self.convert_webp = convert_webp
 
         # If username and quality provided, create collection directory
         if username and quality:
             collection_name = f"mapillary-{username}-{quality}"
+            if convert_webp:
+                collection_name += "-webp"
             self.output_dir = self.base_output_dir / collection_name
         else:
             self.output_dir = self.base_output_dir
@@ -190,6 +196,7 @@ class MapillaryDownloader:
         downloaded_count = 0
         total_bytes = 0
         failed_count = 0
+        batch_start_time = time.time()
 
         with ProcessPoolExecutor(max_workers=self.workers) as executor:
             # Submit all tasks
@@ -215,7 +222,16 @@ class MapillaryDownloader:
                     total_bytes += bytes_dl
 
                     if downloaded_count % 10 == 0:
-                        logger.info(f"Downloaded: {downloaded_count}/{len(images)} ({format_size(total_bytes)})")
+                        # Calculate ETA
+                        elapsed = time.time() - batch_start_time
+                        rate = downloaded_count / elapsed if elapsed > 0 else 0
+                        remaining = len(images) - downloaded_count
+                        eta_seconds = remaining / rate if rate > 0 else 0
+
+                        logger.info(
+                            f"Downloaded: {downloaded_count}/{len(images)} ({format_size(total_bytes)}) "
+                            f"- ETA: {format_time(eta_seconds)}"
+                        )
                         self._save_progress()
                 else:
                     failed_count += 1

@@ -79,7 +79,13 @@ def main():
     try:
         client = MapillaryClient(args.token)
         downloader = MapillaryDownloader(
-            client, args.output, args.username, args.quality, workers=args.workers, tar_sequences=not args.no_tar
+            client,
+            args.output,
+            args.username,
+            args.quality,
+            workers=args.workers,
+            tar_sequences=not args.no_tar,
+            convert_webp=args.webp,
         )
         downloader.download_user_data(bbox=bbox, convert_webp=args.webp)
     except KeyboardInterrupt:

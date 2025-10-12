@@ -3,6 +3,7 @@
 import logging
 import tarfile
 from pathlib import Path
+from mapillary_downloader.utils import format_size
 
 logger = logging.getLogger("mapillary_downloader")
 
@@ -38,6 +39,7 @@ def tar_sequence_directories(collection_dir):
 
     tarred_count = 0
     total_files = 0
+    total_tar_bytes = 0
 
     for seq_dir in sequence_dirs:
         seq_name = seq_dir.name
@@ -87,6 +89,9 @@ def tar_sequence_directories(collection_dir):
 
             # Verify tar was created and has size
             if tar_path.exists() and tar_path.stat().st_size > 0:
+                tar_size = tar_path.stat().st_size
+                total_tar_bytes += tar_size
+
                 # Remove original directory
                 for file in seq_dir.rglob("*"):
                     if file.is_file():
@@ -117,5 +122,7 @@ def tar_sequence_directories(collection_dir):
             if tar_path.exists():
                 tar_path.unlink()
 
-    logger.info(f"Tarred {tarred_count} sequences ({total_files:,} files total)")
+    logger.info(
+        f"Tarred {tarred_count} sequences ({total_files:,} files, {format_size(total_tar_bytes)} total tar size)"
+    )
     return tarred_count, total_files
