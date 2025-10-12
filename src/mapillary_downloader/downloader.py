@@ -1,5 +1,6 @@
 """Main downloader logic."""
 
+import gzip
 import json
 import logging
 import os
@@ -234,6 +235,25 @@ class MapillaryDownloader:
         # Tar sequence directories for efficient IA uploads
         if self.tar_sequences:
             tar_sequence_directories(self.output_dir)
+
+        # Gzip metadata.jsonl to save space
+        if self.metadata_file.exists():
+            logger.info("Compressing metadata.jsonl...")
+            original_size = self.metadata_file.stat().st_size
+            gzipped_file = self.metadata_file.with_suffix(".jsonl.gz")
+
+            with open(self.metadata_file, "rb") as f_in:
+                with gzip.open(gzipped_file, "wb", compresslevel=9) as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+
+            compressed_size = gzipped_file.stat().st_size
+            self.metadata_file.unlink()
+
+            savings = 100 * (1 - compressed_size / original_size)
+            logger.info(
+                f"Compressed metadata: {format_size(original_size)} → {format_size(compressed_size)} "
+                f"({savings:.1f}% savings)"
+            )
 
         # Generate IA metadata
         generate_ia_metadata(self.output_dir)

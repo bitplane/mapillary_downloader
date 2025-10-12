@@ -101,9 +101,12 @@ def test_download_user_data(mock_cache, mock_tar, mock_ia_meta, tmp_path, capsys
     assert mock_tar.call_count == 1
     assert mock_ia_meta.call_count == 1
 
-    # Check that metadata was created in staging and moved to final
-    assert (tmp_path / "mapillary-testuser-original" / "metadata.jsonl").exists()
-    metadata_lines = (tmp_path / "mapillary-testuser-original" / "metadata.jsonl").read_text().strip().split("\n")
+    # Check that metadata was created, gzipped, and moved to final
+    assert (tmp_path / "mapillary-testuser-original" / "metadata.jsonl.gz").exists()
+    import gzip
+
+    with gzip.open(tmp_path / "mapillary-testuser-original" / "metadata.jsonl.gz", "rt") as f:
+        metadata_lines = f.read().strip().split("\n")
     assert len(metadata_lines) == 2
 
 
