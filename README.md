@@ -36,6 +36,7 @@ mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./down
 | `--bbox`      | `west,south,east,north`               | `None`             |
 | `--webp`      | Convert to WebP (saves ~70% space)    | `False`            |
 | `--workers`   | Number of parallel download workers   | CPU count          |
+| `--no-tar`    | Don't tar sequence directories        | `False`            |
 
 The downloader will:
 
@@ -45,6 +46,7 @@ The downloader will:
   compass direction)
 * 🛟 Save progress so you can safely resume if interrupted
 * 🗜️ Optionally convert to WebP format for massive space savings
+* 📦 Tar sequence directories for efficient Internet Archive uploads
 
 ## WebP Conversion
 
@@ -63,6 +65,23 @@ sudo apt install webp
 
 # macOS
 brew install webp
+```
+
+## Sequence Tarball Creation
+
+By default, sequence directories are automatically tarred after download to
+optimize Internet Archive uploads. This reduces upload time and IA processing
+overhead by bundling thousands of small files into single tar files per
+sequence.
+
+The tar files are uncompressed (since WebP/JPEG are already compressed) and use
+relative paths for proper extraction. If a tar file already exists, collision
+handling creates `.2.tar`, `.3.tar` suffixes automatically.
+
+To keep individual files instead of creating tars, use the `--no-tar` flag:
+
+```bash
+mapillary-downloader --username YOUR_USERNAME --no-tar
 ```
 
 ## Development

@@ -40,6 +40,11 @@ def main():
         default=None,
         help="Number of parallel workers (default: number of CPU cores)",
     )
+    parser.add_argument(
+        "--no-tar",
+        action="store_true",
+        help="Don't tar sequence directories (keep individual files)",
+    )
 
     args = parser.parse_args()
 
@@ -67,7 +72,9 @@ def main():
 
     try:
         client = MapillaryClient(args.token)
-        downloader = MapillaryDownloader(client, args.output, args.username, args.quality, workers=args.workers)
+        downloader = MapillaryDownloader(
+            client, args.output, args.username, args.quality, workers=args.workers, tar_sequences=not args.no_tar
+        )
         downloader.download_user_data(bbox=bbox, convert_webp=args.webp)
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")

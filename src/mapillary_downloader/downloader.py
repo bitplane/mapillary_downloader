@@ -9,6 +9,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from mapillary_downloader.utils import format_size, format_time
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.worker import download_and_convert_image
+from mapillary_downloader.tar_sequences import tar_sequence_directories
 
 logger = logging.getLogger("mapillary_downloader")
 
@@ -16,7 +17,7 @@ logger = logging.getLogger("mapillary_downloader")
 class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 
-    def __init__(self, client, output_dir, username=None, quality=None, workers=None):
+    def __init__(self, client, output_dir, username=None, quality=None, workers=None, tar_sequences=True):
         """Initialize the downloader.
 
         Args:
@@ -25,12 +26,14 @@ class MapillaryDownloader:
             username: Mapillary username (for collection directory)
             quality: Image quality (for collection directory)
             workers: Number of parallel workers (default: cpu_count)
+            tar_sequences: Whether to tar sequence directories after download (default: True)
         """
         self.client = client
         self.base_output_dir = Path(output_dir)
         self.username = username
         self.quality = quality
         self.workers = workers if workers is not None else os.cpu_count()
+        self.tar_sequences = tar_sequences
 
         # If username and quality provided, create collection directory
         if username and quality:
@@ -160,6 +163,10 @@ class MapillaryDownloader:
             f"skipped {skipped}, failed {failed_count}"
         )
         logger.info(f"Total time: {format_time(elapsed)}")
+
+        # Tar sequence directories for efficient IA uploads
+        if self.tar_sequences:
+            tar_sequence_directories(self.output_dir)
 
         # Generate IA metadata
         generate_ia_metadata(self.output_dir)
