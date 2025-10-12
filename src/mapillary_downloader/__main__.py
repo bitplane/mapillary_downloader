@@ -34,6 +34,12 @@ def main():
         action="store_true",
         help="Convert images to WebP format (saves ~70%% disk space, requires cwebp binary)",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers (default: number of CPU cores)",
+    )
 
     args = parser.parse_args()
 
@@ -61,7 +67,7 @@ def main():
 
     try:
         client = MapillaryClient(args.token)
-        downloader = MapillaryDownloader(client, args.output, args.username, args.quality)
+        downloader = MapillaryDownloader(client, args.output, args.username, args.quality, workers=args.workers)
         downloader.download_user_data(bbox=bbox, convert_webp=args.webp)
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")
