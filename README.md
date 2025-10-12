@@ -28,25 +28,28 @@ mapillary-downloader --token YOUR_TOKEN USERNAME1 USERNAME2
 mapillary-downloader --output ./downloads USERNAME1
 ```
 
-| option        | because                               | default            |
-| ------------- | ------------------------------------- | ------------------ |
-| `usernames`   | One or more Mapillary usernames       | (required)         |
-| `--token`     | Mapillary API token (or env var)      | `$MAPILLARY_TOKEN` |
-| `--output`    | Output directory                      | `./mapillary_data` |
-| `--quality`   | 256, 1024, 2048 or original           | `original`         |
-| `--bbox`      | `west,south,east,north`               | `None`             |
-| `--no-webp`   | Don't convert to WebP                 | `False`            |
-| `--workers`   | Number of parallel download workers   | Half of CPU count  |
-| `--no-tar`    | Don't tar sequence directories        | `False`            |
+| option          | because                                      | default            |
+| --------------- | -------------------------------------------- | ------------------ |
+| `usernames`     | One or more Mapillary usernames              | (required)         |
+| `--token`       | Mapillary API token (or env var)             | `$MAPILLARY_TOKEN` |
+| `--output`      | Output directory                             | `./mapillary_data` |
+| `--quality`     | 256, 1024, 2048 or original                  | `original`         |
+| `--bbox`        | `west,south,east,north`                      | `None`             |
+| `--no-webp`     | Don't convert to WebP                        | `False`            |
+| `--workers`     | Number of parallel download workers          | Half of CPU count  |
+| `--no-tar`      | Don't tar sequence directories               | `False`            |
+| `--no-check-ia` | Don't check if exists on Internet Archive    | `False`            |
 
 The downloader will:
 
-* 📷 Download a user's images organized by sequence
+* 📷 Download multiple users' images organized by sequence
 * 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps,
   compass direction)
 * 🛟 Save progress so you can safely resume if interrupted
-* 🗜️ Optionally convert to WebP to save space
+* 🗜️ Convert to WebP by default to save ~70% disk space
 * 📦 Tar sequence directories for faster uploads
+* 🏛️ Check Internet Archive to avoid duplicate downloads
+* 💾 Stage downloads in cache, move atomically when complete
 
 ## WebP Conversion
 

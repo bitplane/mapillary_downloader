@@ -9,6 +9,7 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from mapillary_downloader.utils import format_size, format_time
 from mapillary_downloader.ia_meta import generate_ia_metadata
+from mapillary_downloader.ia_check import check_ia_exists
 from mapillary_downloader.worker import download_and_convert_image
 from mapillary_downloader.tar_sequences import tar_sequence_directories
 from mapillary_downloader.logging_config import add_file_handler
@@ -37,7 +38,15 @@ class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 
     def __init__(
-        self, client, output_dir, username=None, quality=None, workers=None, tar_sequences=True, convert_webp=False
+        self,
+        client,
+        output_dir,
+        username=None,
+        quality=None,
+        workers=None,
+        tar_sequences=True,
+        convert_webp=False,
+        check_ia=True,
     ):
         """Initialize the downloader.
 
@@ -49,6 +58,7 @@ class MapillaryDownloader:
             workers: Number of parallel workers (default: half of cpu_count)
             tar_sequences: Whether to tar sequence directories after download (default: True)
             convert_webp: Whether to convert images to WebP (affects collection name)
+            check_ia: Whether to check if collection exists on Internet Archive (default: True)
         """
         self.client = client
         self.base_output_dir = Path(output_dir)
@@ -57,20 +67,22 @@ class MapillaryDownloader:
         self.workers = workers if workers is not None else max(1, os.cpu_count() // 2)
         self.tar_sequences = tar_sequences
         self.convert_webp = convert_webp
+        self.check_ia = check_ia
 
         # Determine collection name
         if username and quality:
             collection_name = f"mapillary-{username}-{quality}"
             if convert_webp:
                 collection_name += "-webp"
+            self.collection_name = collection_name
         else:
-            collection_name = None
+            self.collection_name = None
 
         # Set up staging directory in cache
         cache_dir = get_cache_dir()
-        if collection_name:
-            self.staging_dir = cache_dir / collection_name
-            self.final_dir = self.base_output_dir / collection_name
+        if self.collection_name:
+            self.staging_dir = cache_dir / self.collection_name
+            self.final_dir = self.base_output_dir / self.collection_name
         else:
             self.staging_dir = cache_dir / "download"
             self.final_dir = self.base_output_dir
@@ -116,6 +128,13 @@ class MapillaryDownloader:
         """
         if not self.username or not self.quality:
             raise ValueError("Username and quality must be provided during initialization")
+
+        # Check if collection already exists on Internet Archive
+        if self.check_ia and self.collection_name:
+            logger.info(f"Checking if {self.collection_name} exists on Internet Archive...")
+            if check_ia_exists(self.collection_name):
+                logger.info("Collection already exists on archive.org, skipping download")
+                return
 
         # Check if collection already exists in final destination
         if self.final_dir.exists():

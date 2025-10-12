@@ -51,6 +51,11 @@ def main():
         action="store_true",
         help="Don't tar sequence directories (keep individual files)",
     )
+    parser.add_argument(
+        "--no-check-ia",
+        action="store_true",
+        help="Don't check if collection exists on Internet Archive before downloading",
+    )
 
     args = parser.parse_args()
 
@@ -100,6 +105,7 @@ def main():
                 workers=args.workers,
                 tar_sequences=not args.no_tar,
                 convert_webp=convert_webp,
+                check_ia=not args.no_check_ia,
             )
             downloader.download_user_data(bbox=bbox, convert_webp=convert_webp)
 
