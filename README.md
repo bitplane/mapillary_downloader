@@ -17,22 +17,25 @@ First, get your Mapillary API access token from
 [the developer dashboard](https://www.mapillary.com/dashboard/developers)
 
 ```bash
-# Set token via environment variable
+# Set token via environment variable (recommended)
 export MAPILLARY_TOKEN=YOUR_TOKEN
-mapillary-downloader --username SOME_USERNAME --output ./downloads
+mapillary-downloader USERNAME1 USERNAME2 USERNAME3
 
 # Or pass token directly, and have it in your shell history 💩👀
-mapillary-downloader --token YOUR_TOKEN --username SOME_USERNAME --output ./downloads
+mapillary-downloader --token YOUR_TOKEN USERNAME1 USERNAME2
+
+# Download to specific directory
+mapillary-downloader --output ./downloads USERNAME1
 ```
 
 | option        | because                               | default            |
 | ------------- | ------------------------------------- | ------------------ |
-| `--username`  | Mapillary username                    | None (required)    |
+| `usernames`   | One or more Mapillary usernames       | (required)         |
 | `--token`     | Mapillary API token (or env var)      | `$MAPILLARY_TOKEN` |
 | `--output`    | Output directory                      | `./mapillary_data` |
 | `--quality`   | 256, 1024, 2048 or original           | `original`         |
 | `--bbox`      | `west,south,east,north`               | `None`             |
-| `--webp`      | Convert to WebP (saves ~70% space)    | `False`            |
+| `--no-webp`   | Don't convert to WebP                 | `False`            |
 | `--workers`   | Number of parallel download workers   | Half of CPU count  |
 | `--no-tar`    | Don't tar sequence directories        | `False`            |
 
@@ -47,7 +50,7 @@ The downloader will:
 
 ## WebP Conversion
 
-You'll need `cwebp` to use the `--webp` flag. So install it:
+WebP conversion is **enabled by default** (saves ~70% disk space). You'll need the `cwebp` binary installed:
 
 ```bash
 # Debian/Ubuntu
@@ -55,6 +58,12 @@ sudo apt install webp
 
 # macOS
 brew install webp
+```
+
+To disable WebP conversion and keep original JPEGs, use `--no-webp`:
+
+```bash
+mapillary-downloader --no-webp USERNAME
 ```
 
 ## Sequence Tarball Creation
@@ -66,7 +75,7 @@ uploading files to IA.
 To keep individual files instead of creating tars, use the `--no-tar` flag:
 
 ```bash
-mapillary-downloader --username WHOEVER --no-tar
+mapillary-downloader --no-tar USERNAME
 ```
 
 ## Internet Archive upload
