@@ -60,3 +60,23 @@ def setup_logging(level=logging.INFO):
     logger.addHandler(handler)
 
     return logger
+
+
+def add_file_handler(log_file, level=logging.INFO):
+    """Add a file handler to the logger for archival.
+
+    Args:
+        log_file: Path to log file
+        level: Logging level for file handler
+    """
+    # Use plain formatter for file (no colors)
+    formatter = logging.Formatter(fmt="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+    handler.setFormatter(formatter)
+    handler.setLevel(level)
+
+    logger = logging.getLogger("mapillary_downloader")
+    logger.addHandler(handler)
+
+    return handler

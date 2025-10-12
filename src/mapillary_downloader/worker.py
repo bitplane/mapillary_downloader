@@ -1,5 +1,6 @@
 """Worker process for parallel image download and conversion."""
 
+import os
 import tempfile
 from pathlib import Path
 import requests
@@ -79,6 +80,12 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, ac
             webp_path = convert_to_webp(jpg_path, output_path=final_path, delete_original=False)
             if not webp_path:
                 return (image_id, bytes_downloaded, False, "WebP conversion failed")
+
+        # Set file mtime to captured_at timestamp for reproducibility
+        if "captured_at" in image_data:
+            # captured_at is in milliseconds, convert to seconds
+            mtime = image_data["captured_at"] / 1000
+            os.utime(final_path, (mtime, mtime))
 
         return (image_id, bytes_downloaded, True, None)
 

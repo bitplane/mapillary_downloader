@@ -10,6 +10,7 @@ from mapillary_downloader.utils import format_size, format_time
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.worker import download_and_convert_image
 from mapillary_downloader.tar_sequences import tar_sequence_directories
+from mapillary_downloader.logging_config import add_file_handler
 
 logger = logging.getLogger("mapillary_downloader")
 
@@ -43,6 +44,11 @@ class MapillaryDownloader:
             self.output_dir = self.base_output_dir
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set up file logging for archival
+        log_file = self.output_dir / "download.log"
+        add_file_handler(log_file)
+        logger.info(f"Logging to: {log_file}")
 
         self.metadata_file = self.output_dir / "metadata.jsonl"
         self.progress_file = self.output_dir / "progress.json"
