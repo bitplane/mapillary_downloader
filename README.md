@@ -4,33 +4,31 @@ Download your Mapillary data before it's gone.
 
 ## Installation
 
+Installation is optional, you can prefix the command with `uvx` or `pipx` to
+download and run it. Or if you're oldskool you can do:
+
 ```bash
 pip install mapillary-downloader
 ```
 
-Or from source:
-
-```bash
-make install
-```
-
 ## Usage
 
-First, get your Mapillary API access token from https://www.mapillary.com/dashboard/developers
+First, get your Mapillary API access token from
+[the developer dashboard](https://www.mapillary.com/dashboard/developers)
 
 ```bash
-# Set token via environment variable (recommended)
+# Set token via environment variable
 export MAPILLARY_TOKEN=YOUR_TOKEN
-mapillary-downloader --username YOUR_USERNAME --output ./downloads
+mapillary-downloader --username SOME_USERNAME --output ./downloads
 
-# Or pass token directly
-mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./downloads
+# Or pass token directly, and have it in your shell history 💩👀
+mapillary-downloader --token YOUR_TOKEN --username SOME_USERNAME --output ./downloads
 ```
 
 | option        | because                               | default            |
 | ------------- | ------------------------------------- | ------------------ |
-| `--token`     | Mapillary API token (or env var)      | `$MAPILLARY_TOKEN` |
 | `--username`  | Mapillary username                    | None (required)    |
+| `--token`     | Mapillary API token (or env var)      | `$MAPILLARY_TOKEN` |
 | `--output`    | Output directory                      | `./mapillary_data` |
 | `--quality`   | 256, 1024, 2048 or original           | `original`         |
 | `--bbox`      | `west,south,east,north`               | `None`             |
@@ -40,24 +38,16 @@ mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./down
 
 The downloader will:
 
-* 💾 Fetch all your uploaded images from Mapillary
-* 📷 Download full-resolution images organized by sequence
+* 📷 Download a user's images organized by sequence
 * 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps,
   compass direction)
 * 🛟 Save progress so you can safely resume if interrupted
-* 🗜️ Optionally convert to WebP format for massive space savings
-* 📦 Tar sequence directories for efficient Internet Archive uploads
+* 🗜️ Optionally convert to WebP to save space
+* 📦 Tar sequence directories for faster uploads
 
 ## WebP Conversion
 
-Use the `--webp` flag to convert images to WebP format after download:
-
-```bash
-mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --webp
-```
-
-This reduces storage by approximately 70% while preserving all EXIF metadata
-including GPS coordinates. Requires the `cwebp` binary to be installed:
+You'll need `cwebp` to use the `--webp` flag. So install it:
 
 ```bash
 # Debian/Ubuntu
@@ -69,19 +59,14 @@ brew install webp
 
 ## Sequence Tarball Creation
 
-By default, sequence directories are automatically tarred after download to
-optimize Internet Archive uploads. This reduces upload time and IA processing
-overhead by bundling thousands of small files into single tar files per
-sequence.
-
-The tar files are uncompressed (since WebP/JPEG are already compressed) and use
-relative paths for proper extraction. If a tar file already exists, collision
-handling creates `.2.tar`, `.3.tar` suffixes automatically.
+By default, sequence directories are automatically tarred after download because
+if they weren't, you'd spend more time setting up upload metadata than actually
+uploading files to IA.
 
 To keep individual files instead of creating tars, use the `--no-tar` flag:
 
 ```bash
-mapillary-downloader --username YOUR_USERNAME --no-tar
+mapillary-downloader --username WHOEVER --no-tar
 ```
 
 ## Development
@@ -89,13 +74,14 @@ mapillary-downloader --username YOUR_USERNAME --no-tar
 ```bash
 make dev      # Setup dev environment
 make test     # Run tests
-make coverage # Run tests with coverage
+make dist     # Build the distribution
+make help     # See other make options
 ```
 
 ## Links
 
 * [🏠 home](https://bitplane.net/dev/python/mapillary_downloader)
-* [📖 pydoc](https://bitplane.net/dev/python/mapillary_downloader/pydoc)
+  * [📖 pydoc](https://bitplane.net/dev/python/mapillary_downloader/pydoc)
 * [🐍 pypi](https://pypi.org/project/mapillary-downloader)
 * [🐱 github](https://github.com/bitplane/mapillary_downloader)
 

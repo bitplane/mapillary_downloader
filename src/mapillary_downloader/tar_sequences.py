@@ -60,8 +60,9 @@ def tar_sequence_directories(collection_dir):
         try:
             # Create uncompressed tar (WebP already compressed)
             # Use -C to change directory so paths in tar are relative
+            # Use -- to prevent sequence IDs starting with - from being interpreted as options
             result = subprocess.run(
-                ["tar", "-cf", str(tar_path), "-C", str(collection_dir), seq_name],
+                ["tar", "-cf", str(tar_path), "-C", str(collection_dir), "--", seq_name],
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout per tar
