@@ -1,6 +1,7 @@
 """CLI entry point."""
 
 import argparse
+import os
 import sys
 from mapillary_downloader.client import MapillaryClient
 from mapillary_downloader.downloader import MapillaryDownloader
@@ -14,8 +15,12 @@ def main():
     logger = setup_logging()
 
     parser = argparse.ArgumentParser(description="Download your Mapillary data before it's gone")
-    parser.add_argument("--token", required=True, help="Mapillary API access token")
-    parser.add_argument("--username", required=True, help="Your Mapillary username")
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("MAPILLARY_TOKEN"),
+        help="Mapillary API access token (or set MAPILLARY_TOKEN env var)",
+    )
+    parser.add_argument("--username", required=True, help="Mapillary username")
     parser.add_argument("--output", default="./mapillary_data", help="Output directory (default: ./mapillary_data)")
     parser.add_argument(
         "--quality",
@@ -31,6 +36,11 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Check for token
+    if not args.token:
+        logger.error("Error: Mapillary API token required. Use --token or set MAPILLARY_TOKEN environment variable")
+        sys.exit(1)
 
     bbox = None
     if args.bbox:

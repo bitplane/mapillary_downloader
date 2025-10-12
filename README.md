@@ -19,13 +19,18 @@ make install
 First, get your Mapillary API access token from https://www.mapillary.com/dashboard/developers
 
 ```bash
+# Set token via environment variable (recommended)
+export MAPILLARY_TOKEN=YOUR_TOKEN
+mapillary-downloader --username YOUR_USERNAME --output ./downloads
+
+# Or pass token directly
 mapillary-downloader --token YOUR_TOKEN --username YOUR_USERNAME --output ./downloads
 ```
 
 | option        | because                               | default            |
 | ------------- | ------------------------------------- | ------------------ |
-| `--token`     | Your Mapillary API access token       | None (required)    |
-| `--username`  | Your Mapillary username               | None (required)    |
+| `--token`     | Mapillary API token (or env var)      | `$MAPILLARY_TOKEN` |
+| `--username`  | Mapillary username                    | None (required)    |
 | `--output`    | Output directory                      | `./mapillary_data` |
 | `--quality`   | 256, 1024, 2048 or original           | `original`         |
 | `--bbox`      | `west,south,east,north`               | `None`             |
