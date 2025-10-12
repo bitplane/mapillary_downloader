@@ -38,7 +38,7 @@ def main():
         "--workers",
         type=int,
         default=None,
-        help="Number of parallel workers (default: number of CPU cores)",
+        help="Number of parallel workers (default: half of CPU cores)",
     )
     parser.add_argument(
         "--no-tar",

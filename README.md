@@ -33,7 +33,7 @@ mapillary-downloader --token YOUR_TOKEN --username SOME_USERNAME --output ./down
 | `--quality`   | 256, 1024, 2048 or original           | `original`         |
 | `--bbox`      | `west,south,east,north`               | `None`             |
 | `--webp`      | Convert to WebP (saves ~70% space)    | `False`            |
-| `--workers`   | Number of parallel download workers   | CPU count          |
+| `--workers`   | Number of parallel download workers   | Half of CPU count  |
 | `--no-tar`    | Don't tar sequence directories        | `False`            |
 
 The downloader will:

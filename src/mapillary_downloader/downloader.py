@@ -25,14 +25,14 @@ class MapillaryDownloader:
             output_dir: Base directory to save downloads
             username: Mapillary username (for collection directory)
             quality: Image quality (for collection directory)
-            workers: Number of parallel workers (default: cpu_count)
+            workers: Number of parallel workers (default: half of cpu_count)
             tar_sequences: Whether to tar sequence directories after download (default: True)
         """
         self.client = client
         self.base_output_dir = Path(output_dir)
         self.username = username
         self.quality = quality
-        self.workers = workers if workers is not None else os.cpu_count()
+        self.workers = workers if workers is not None else max(1, os.cpu_count() // 2)
         self.tar_sequences = tar_sequences
 
         # If username and quality provided, create collection directory
