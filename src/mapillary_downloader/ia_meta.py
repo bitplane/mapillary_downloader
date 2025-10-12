@@ -135,7 +135,7 @@ def generate_ia_metadata(collection_dir):
     write_meta_tag(
         meta_dir,
         "title",
-        f"Mapillary images by {username} ({quality} quality)",
+        f"Mapillary images by {username}",
     )
 
     description = (
