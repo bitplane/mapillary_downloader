@@ -8,6 +8,7 @@ from pathlib import Path
 from collections import deque
 from mapillary_downloader.exif_writer import write_exif_to_image
 from mapillary_downloader.utils import format_size, format_time
+from mapillary_downloader.webp_converter import convert_to_webp
 
 logger = logging.getLogger("mapillary_downloader")
 
@@ -46,13 +47,14 @@ class MapillaryDownloader:
             os.fsync(f.fileno())
         temp_file.replace(self.progress_file)
 
-    def download_user_data(self, username, quality="original", bbox=None):
+    def download_user_data(self, username, quality="original", bbox=None, convert_webp=False):
         """Download all images for a user.
 
         Args:
             username: Mapillary username
             quality: Image quality to download (256, 1024, 2048, original)
             bbox: Optional bounding box [west, south, east, north]
+            convert_webp: Convert images to WebP format after download
         """
         quality_field = f"thumb_{quality}_url"
 
@@ -109,6 +111,12 @@ class MapillaryDownloader:
                             download_times.append(download_time)
 
                             write_exif_to_image(output_path, image)
+
+                            # Convert to WebP if requested
+                            if convert_webp:
+                                webp_path = convert_to_webp(output_path)
+                                if webp_path:
+                                    output_path = webp_path
 
                             self.downloaded.add(image_id)
                             downloaded_count += 1
@@ -168,6 +176,12 @@ class MapillaryDownloader:
 
                     # Write EXIF metadata to the downloaded image
                     write_exif_to_image(output_path, image)
+
+                    # Convert to WebP if requested
+                    if convert_webp:
+                        webp_path = convert_to_webp(output_path)
+                        if webp_path:
+                            output_path = webp_path
 
                     self.downloaded.add(image_id)
                     downloaded_count += 1

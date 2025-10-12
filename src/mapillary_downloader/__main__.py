@@ -5,6 +5,7 @@ import sys
 from mapillary_downloader.client import MapillaryClient
 from mapillary_downloader.downloader import MapillaryDownloader
 from mapillary_downloader.logging_config import setup_logging
+from mapillary_downloader.webp_converter import check_cwebp_available
 
 
 def main():
@@ -23,6 +24,11 @@ def main():
         help="Image quality to download (default: original)",
     )
     parser.add_argument("--bbox", help="Bounding box: west,south,east,north")
+    parser.add_argument(
+        "--webp",
+        action="store_true",
+        help="Convert images to WebP format (saves ~83%% disk space, requires cwebp binary)",
+    )
 
     args = parser.parse_args()
 
@@ -36,10 +42,17 @@ def main():
             logger.error("Error: bbox must be four comma-separated numbers")
             sys.exit(1)
 
+    # Check for cwebp binary if WebP conversion is requested
+    if args.webp:
+        if not check_cwebp_available():
+            logger.error("Error: cwebp binary not found. Install webp package (e.g., apt install webp)")
+            sys.exit(1)
+        logger.info("WebP conversion enabled - images will be converted after download")
+
     try:
         client = MapillaryClient(args.token)
         downloader = MapillaryDownloader(client, args.output)
-        downloader.download_user_data(args.username, args.quality, bbox)
+        downloader.download_user_data(args.username, args.quality, bbox, convert_webp=args.webp)
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")
         sys.exit(1)
