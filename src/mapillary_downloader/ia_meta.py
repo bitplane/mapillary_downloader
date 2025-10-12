@@ -1,5 +1,6 @@
 """Internet Archive metadata generation for Mapillary collections."""
 
+import gzip
 import json
 import logging
 import re
@@ -26,10 +27,10 @@ def parse_collection_name(directory):
 
 
 def get_date_range(metadata_file):
-    """Get first and last captured_at dates from metadata.jsonl.
+    """Get first and last captured_at dates from metadata.jsonl.gz.
 
     Args:
-        metadata_file: Path to metadata.jsonl file
+        metadata_file: Path to metadata.jsonl.gz file
 
     Returns:
         Tuple of (first_date, last_date) as ISO format strings, or (None, None)
@@ -38,7 +39,7 @@ def get_date_range(metadata_file):
         return None, None
 
     timestamps = []
-    with open(metadata_file) as f:
+    with gzip.open(metadata_file, "rt") as f:
         for line in f:
             if line.strip():
                 data = json.loads(line)
@@ -59,10 +60,10 @@ def get_date_range(metadata_file):
 
 
 def count_images(metadata_file):
-    """Count number of images in metadata.jsonl.
+    """Count number of images in metadata.jsonl.gz.
 
     Args:
-        metadata_file: Path to metadata.jsonl file
+        metadata_file: Path to metadata.jsonl.gz file
 
     Returns:
         Number of images
@@ -71,7 +72,7 @@ def count_images(metadata_file):
         return 0
 
     count = 0
-    with open(metadata_file) as f:
+    with gzip.open(metadata_file, "rt") as f:
         for line in f:
             if line.strip():
                 count += 1
@@ -112,9 +113,9 @@ def generate_ia_metadata(collection_dir):
         logger.error(f"Could not parse username/quality from directory: {collection_dir.name}")
         return False
 
-    metadata_file = collection_dir / "metadata.jsonl"
+    metadata_file = collection_dir / "metadata.jsonl.gz"
     if not metadata_file.exists():
-        logger.error(f"metadata.jsonl not found in {collection_dir}")
+        logger.error(f"metadata.jsonl.gz not found in {collection_dir}")
         return False
 
     logger.info(f"Generating IA metadata for {collection_dir.name}...")
