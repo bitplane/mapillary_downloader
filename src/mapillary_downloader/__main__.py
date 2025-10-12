@@ -51,8 +51,8 @@ def main():
 
     try:
         client = MapillaryClient(args.token)
-        downloader = MapillaryDownloader(client, args.output)
-        downloader.download_user_data(args.username, args.quality, bbox, convert_webp=args.webp)
+        downloader = MapillaryDownloader(client, args.output, args.username, args.quality)
+        downloader.download_user_data(bbox=bbox, convert_webp=args.webp)
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")
         sys.exit(1)

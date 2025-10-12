@@ -9,6 +9,7 @@ from collections import deque
 from mapillary_downloader.exif_writer import write_exif_to_image
 from mapillary_downloader.utils import format_size, format_time
 from mapillary_downloader.webp_converter import convert_to_webp
+from mapillary_downloader.ia_meta import generate_ia_metadata
 
 logger = logging.getLogger("mapillary_downloader")
 
@@ -16,15 +17,27 @@ logger = logging.getLogger("mapillary_downloader")
 class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 
-    def __init__(self, client, output_dir):
+    def __init__(self, client, output_dir, username=None, quality=None):
         """Initialize the downloader.
 
         Args:
             client: MapillaryClient instance
-            output_dir: Directory to save downloads
+            output_dir: Base directory to save downloads
+            username: Mapillary username (for collection directory)
+            quality: Image quality (for collection directory)
         """
         self.client = client
-        self.output_dir = Path(output_dir)
+        self.base_output_dir = Path(output_dir)
+        self.username = username
+        self.quality = quality
+
+        # If username and quality provided, create collection directory
+        if username and quality:
+            collection_name = f"mapillary-{username}-{quality}"
+            self.output_dir = self.base_output_dir / collection_name
+        else:
+            self.output_dir = self.base_output_dir
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.metadata_file = self.output_dir / "metadata.jsonl"
@@ -47,20 +60,21 @@ class MapillaryDownloader:
             os.fsync(f.fileno())
         temp_file.replace(self.progress_file)
 
-    def download_user_data(self, username, quality="original", bbox=None, convert_webp=False):
+    def download_user_data(self, bbox=None, convert_webp=False):
         """Download all images for a user.
 
         Args:
-            username: Mapillary username
-            quality: Image quality to download (256, 1024, 2048, original)
             bbox: Optional bounding box [west, south, east, north]
             convert_webp: Convert images to WebP format after download
         """
-        quality_field = f"thumb_{quality}_url"
+        if not self.username or not self.quality:
+            raise ValueError("Username and quality must be provided during initialization")
 
-        logger.info(f"Downloading images for user: {username}")
+        quality_field = f"thumb_{self.quality}_url"
+
+        logger.info(f"Downloading images for user: {self.username}")
         logger.info(f"Output directory: {self.output_dir}")
-        logger.info(f"Quality: {quality}")
+        logger.info(f"Quality: {self.quality}")
 
         processed = 0
         downloaded_count = 0
@@ -92,7 +106,7 @@ class MapillaryDownloader:
                         # Download this un-downloaded image
                         image_url = image.get(quality_field)
                         if not image_url:
-                            logger.warning(f"No {quality} URL for image {image_id}")
+                            logger.warning(f"No {self.quality} URL for image {image_id}")
                             continue
 
                         sequence_id = image.get("sequence")
@@ -133,7 +147,7 @@ class MapillaryDownloader:
         # Always check API for new images (will skip duplicates via seen_ids)
         logger.info("Checking for new images from API...")
         with open(self.metadata_file, "a") as meta_f:
-            for image in self.client.get_user_images(username, bbox=bbox):
+            for image in self.client.get_user_images(self.username, bbox=bbox):
                 image_id = image["id"]
 
                 # Skip if we already have this in our metadata file
@@ -155,7 +169,7 @@ class MapillaryDownloader:
                 # Download image
                 image_url = image.get(quality_field)
                 if not image_url:
-                    logger.warning(f"No {quality} URL for image {image_id}")
+                    logger.warning(f"No {self.quality} URL for image {image_id}")
                     continue
 
                 # Use sequence ID for organization
@@ -204,3 +218,6 @@ class MapillaryDownloader:
             f"Complete! Processed {processed} images, downloaded {downloaded_count} ({format_size(total_bytes)}), skipped {skipped}"
         )
         logger.info(f"Total time: {format_time(elapsed)}")
+
+        # Generate IA metadata
+        generate_ia_metadata(self.output_dir)
