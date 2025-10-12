@@ -69,6 +69,18 @@ To keep individual files instead of creating tars, use the `--no-tar` flag:
 mapillary-downloader --username WHOEVER --no-tar
 ```
 
+## Internet Archive upload
+
+I've written a bash tool to rip media then tag, queue, and upload to The
+Internet Archive. The metadata is in the same format. If you copy completed
+download dirs into the `4.ship` dir, they'll find their way into an
+appropriately named item.
+
+See inlay for details:
+
+* [📀 rip](https://bitplane.net/dev/sh/rip)
+
+
 ## Development
 
 ```bash
@@ -84,6 +96,7 @@ make help     # See other make options
   * [📖 pydoc](https://bitplane.net/dev/python/mapillary_downloader/pydoc)
 * [🐍 pypi](https://pypi.org/project/mapillary-downloader)
 * [🐱 github](https://github.com/bitplane/mapillary_downloader)
+* [📀 rip](https://bitplane.net/dev/sh/rip
 
 ## License
 
