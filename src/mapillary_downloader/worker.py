@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 import requests
 from requests.exceptions import RequestException
-import time
 from mapillary_downloader.exif_writer import write_exif_to_image
 from mapillary_downloader.webp_converter import convert_to_webp
 
@@ -54,29 +53,23 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, ac
             final_path = jpg_path
 
         # Download image
+        # No retries for CDN images - they're cheap, just skip failures and move on
         session = requests.Session()
         session.headers.update({"Authorization": f"OAuth {access_token}"})
 
-        max_retries = 10
-        base_delay = 1.0
         bytes_downloaded = 0
 
-        for attempt in range(max_retries):
-            try:
-                response = session.get(image_url, stream=True, timeout=60)
-                response.raise_for_status()
+        try:
+            # 60 second timeout for entire download (connection + read)
+            response = session.get(image_url, stream=True, timeout=60)
+            response.raise_for_status()
 
-                with open(jpg_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        bytes_downloaded += len(chunk)
-                break
-            except RequestException as e:
-                if attempt == max_retries - 1:
-                    return (image_id, 0, False, f"Download failed: {e}")
-
-                delay = base_delay * (2**attempt)
-                time.sleep(delay)
+            with open(jpg_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    bytes_downloaded += len(chunk)
+        except RequestException as e:
+            return (image_id, 0, False, f"Download failed: {e}")
 
         # Write EXIF metadata
         write_exif_to_image(jpg_path, image_data)
