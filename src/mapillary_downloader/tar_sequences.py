@@ -1,7 +1,7 @@
 """Tar sequence directories for efficient Internet Archive uploads."""
 
 import logging
-import subprocess
+import tarfile
 from pathlib import Path
 
 logger = logging.getLogger("mapillary_downloader")
@@ -58,19 +58,32 @@ def tar_sequence_directories(collection_dir):
             continue
 
         try:
-            # Create uncompressed tar (WebP already compressed)
-            # Use -C to change directory so paths in tar are relative
-            # Use -- to prevent sequence IDs starting with - from being interpreted as options
-            result = subprocess.run(
-                ["tar", "-cf", str(tar_path), "-C", str(collection_dir), "--", seq_name],
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout per tar
-            )
+            # Create reproducible uncompressed tar (WebP already compressed)
+            # Sort files by name for deterministic ordering
+            files_to_tar = sorted([f for f in seq_dir.rglob("*") if f.is_file()], key=lambda x: x.name)
 
-            if result.returncode != 0:
-                logger.error(f"Failed to tar {seq_name}: {result.stderr}")
+            if not files_to_tar:
+                logger.warning(f"Skipping directory with no files: {seq_name}")
                 continue
+
+            with tarfile.open(tar_path, "w") as tar:
+                for file_path in files_to_tar:
+                    # Get path relative to collection_dir for tar archive
+                    arcname = file_path.relative_to(collection_dir)
+
+                    # Create TarInfo for reproducibility
+                    tarinfo = tar.gettarinfo(str(file_path), arcname=str(arcname))
+
+                    # Normalize for reproducibility across platforms
+                    tarinfo.uid = 0
+                    tarinfo.gid = 0
+                    tarinfo.uname = ""
+                    tarinfo.gname = ""
+                    # mtime already set on file by worker, preserve it
+
+                    # Add file to tar
+                    with open(file_path, "rb") as f:
+                        tar.addfile(tarinfo, f)
 
             # Verify tar was created and has size
             if tar_path.exists() and tar_path.stat().st_size > 0:
@@ -99,10 +112,6 @@ def tar_sequence_directories(collection_dir):
                 if tar_path.exists():
                     tar_path.unlink()
 
-        except subprocess.TimeoutExpired:
-            logger.error(f"Timeout tarring {seq_name}")
-            if tar_path.exists():
-                tar_path.unlink()
         except Exception as e:
             logger.error(f"Error tarring {seq_name}: {e}")
             if tar_path.exists():
