@@ -86,9 +86,11 @@ def main():
 
         # Process each username
         for username in args.usernames:
-            logger.info(f"\n{'='*60}")
+            logger.info("")
+            logger.info("=" * 60)
             logger.info(f"Processing user: {username}")
-            logger.info(f"{'='*60}\n")
+            logger.info("=" * 60)
+            logger.info("")
 
             downloader = MapillaryDownloader(
                 client,
