@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from importlib.metadata import version
 from mapillary_downloader.client import MapillaryClient
 from mapillary_downloader.downloader import MapillaryDownloader
 from mapillary_downloader.logging_config import setup_logging
@@ -15,6 +16,11 @@ def main():
     logger = setup_logging()
 
     parser = argparse.ArgumentParser(description="Download your Mapillary data before it's gone")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version('mapillary-downloader')}",
+    )
     parser.add_argument(
         "--token",
         default=os.environ.get("MAPILLARY_TOKEN"),
