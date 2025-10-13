@@ -102,7 +102,7 @@ make help     # See other make options
   * [📖 pydoc](https://bitplane.net/dev/python/mapillary_downloader/pydoc)
 * [🐍 pypi](https://pypi.org/project/mapillary-downloader)
 * [🐱 github](https://github.com/bitplane/mapillary_downloader)
-* [📀 rip](https://bitplane.net/dev/sh/rip
+* [📀 rip](https://bitplane.net/dev/sh/rip)
 
 ## License
 
