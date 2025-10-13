@@ -42,18 +42,17 @@ mapillary-downloader --output ./downloads USERNAME1
 
 The downloader will:
 
+* 🏛️ Check Internet Archive to avoid duplicate downloads
 * 📷 Download multiple users' images organized by sequence
 * 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps,
   compass direction)
+* 🗜️ Convert to WebP (by default) to save ~70% disk space
 * 🛟 Save progress so you can safely resume if interrupted
-* 🗜️ Convert to WebP by default to save ~70% disk space
-* 📦 Tar sequence directories for faster uploads
-* 🏛️ Check Internet Archive to avoid duplicate downloads
-* 💾 Stage downloads in cache, move atomically when complete
+* 📦 Tar sequence directories (by default) for faster uploads to Internet Archive
 
 ## WebP Conversion
 
-WebP conversion is **enabled by default** (saves ~70% disk space). You'll need the `cwebp` binary installed:
+You'll need the `cwebp` binary installed:
 
 ```bash
 # Debian/Ubuntu
@@ -75,18 +74,13 @@ By default, sequence directories are automatically tarred after download because
 if they weren't, you'd spend more time setting up upload metadata than actually
 uploading files to IA.
 
-To keep individual files instead of creating tars, use the `--no-tar` flag:
-
-```bash
-mapillary-downloader --no-tar USERNAME
-```
+To keep individual files instead of creating tars, use the `--no-tar` flag.
 
 ## Internet Archive upload
 
 I've written a bash tool to rip media then tag, queue, and upload to The
-Internet Archive. The metadata is in the same format. If you copy completed
-download dirs into the `4.ship` dir, they'll find their way into an
-appropriately named item.
+Internet Archive. The metadata is in the same format. If you symlink your
+`./mapillary_data` dir to `rip`'s `4.ship` dir, they'll be queued for upload.
 
 See inlay for details:
 
