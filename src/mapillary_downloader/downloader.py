@@ -95,8 +95,9 @@ class MapillaryDownloader:
         logger.info(f"Staging directory: {self.staging_dir}")
         logger.info(f"Final destination: {self.final_dir}")
 
-        # Set up file logging for archival
-        log_file = self.output_dir / "download.log"
+        # Set up file logging for archival with timestamp for incremental runs
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        log_file = self.output_dir / f"download.log.{timestamp}"
         add_file_handler(log_file)
         logger.info(f"Logging to: {log_file}")
 
