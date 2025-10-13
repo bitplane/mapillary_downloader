@@ -128,6 +128,10 @@ def generate_ia_metadata(collection_dir):
         logger.warning("Could not determine date range from metadata")
         first_date = last_date = "unknown"
 
+    # Detect WebP conversion and tarring
+    is_webp = "-webp" in collection_dir.name
+    has_tars = len(list(collection_dir.glob("*.tar"))) > 0
+
     # Create .meta directory
     meta_dir = collection_dir / ".meta"
     meta_dir.mkdir(exist_ok=True)
@@ -139,14 +143,31 @@ def generate_ia_metadata(collection_dir):
         f"Mapillary images by {username}",
     )
 
+    # Build resolution string
+    if quality == "original":
+        resolution_str = "original resolution"
+    else:
+        resolution_str = f"{quality}px resolution"
+
+    # Build description with processing details
     description = (
         f"Street-level imagery from Mapillary user '{username}'. "
-        f"Contains {image_count:,} images captured between {first_date} and {last_date}. "
-        f"Images are organized by sequence ID and include EXIF metadata with GPS coordinates, "
-        f"camera information, and compass direction.\n\n"
-        f"Downloaded using mapillary_downloader (https://bitplane.net/dev/python/mapillary_downloader/). "
-        f"Uploaded using rip (https://bitplane.net/dev/sh/rip)."
+        f"Contains {image_count:,} images in {resolution_str} captured between {first_date} and {last_date}."
     )
+
+    if has_tars:
+        description += " Sequences have been individually tarred."
+
+    if is_webp:
+        description += " Images were recompressed with WebP."
+
+    description += (
+        " Images are organized by sequence ID and include EXIF metadata with GPS coordinates, "
+        "camera information, and compass direction.\n\n"
+        "Downloaded using mapillary_downloader (https://bitplane.net/dev/python/mapillary_downloader/). "
+        "Uploaded using rip (https://bitplane.net/dev/sh/rip)."
+    )
+
     write_meta_tag(meta_dir, "description", description)
 
     # Subject tags
