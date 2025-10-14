@@ -92,8 +92,10 @@ class MapillaryClient:
             images = data.get("data", [])
             total_fetched += len(images)
             logger.info(f"Fetched metadata for {total_fetched:,} images...")
+            logger.debug(f"API response paging: {data.get('paging', {})}")
 
             for image in images:
+                logger.debug(f"Image metadata: {image}")
                 yield image
 
             # Get next page URL

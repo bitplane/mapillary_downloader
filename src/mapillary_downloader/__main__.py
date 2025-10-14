@@ -56,8 +56,20 @@ def main():
         action="store_true",
         help="Don't check if collection exists on Internet Archive before downloading",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging (EXIF data, API responses, etc.)",
+    )
 
     args = parser.parse_args()
+
+    # Set debug logging level if requested
+    if args.debug:
+        import logging
+
+        logging.getLogger("mapillary_downloader").setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
 
     # Check for token
     if not args.token:

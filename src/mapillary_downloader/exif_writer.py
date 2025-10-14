@@ -1,7 +1,10 @@
 """EXIF metadata writer for Mapillary images."""
 
+import logging
 import piexif
 from datetime import datetime
+
+logger = logging.getLogger("mapillary_downloader")
 
 
 def decimal_to_dms(decimal):
@@ -47,6 +50,9 @@ def write_exif_to_image(image_path, metadata):
         True if successful, False otherwise
     """
     try:
+        logger.debug(f"Writing EXIF to {image_path}")
+        logger.debug(f"Metadata: {metadata}")
+
         # Load existing EXIF data if any
         try:
             exif_dict = piexif.load(str(image_path))
@@ -99,13 +105,17 @@ def write_exif_to_image(image_path, metadata):
         # GPS Altitude - prefer computed_altitude over altitude
         altitude = metadata.get("computed_altitude") or metadata.get("altitude")
         if altitude is not None:
-            exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (int(abs(altitude) * 100), 100)
+            altitude_val = int(abs(altitude) * 100)
+            logger.debug(f"Raw altitude value: {altitude}, calculated: {altitude_val}")
+            exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (altitude_val, 100)
             exif_dict["GPS"][piexif.GPSIFD.GPSAltitudeRef] = 1 if altitude < 0 else 0
 
         # GPS Compass direction
         compass = metadata.get("computed_compass_angle") or metadata.get("compass_angle")
         if compass is not None:
-            exif_dict["GPS"][piexif.GPSIFD.GPSImgDirection] = (int(compass * 100), 100)
+            # Normalize compass to 0-360 range
+            compass_val = int((compass % 360) * 100)
+            exif_dict["GPS"][piexif.GPSIFD.GPSImgDirection] = (compass_val, 100)
             exif_dict["GPS"][piexif.GPSIFD.GPSImgDirectionRef] = b"T"  # True north
 
         # GPS Version
@@ -115,8 +125,10 @@ def write_exif_to_image(image_path, metadata):
         exif_bytes = piexif.dump(exif_dict)
         piexif.insert(exif_bytes, str(image_path))
 
+        logger.debug(f"Successfully wrote EXIF to {image_path}")
         return True
 
     except Exception as e:
-        print(f"Warning: Failed to write EXIF data to {image_path}: {e}")
+        logger.warning(f"Failed to write EXIF data to {image_path}: {e}")
+        logger.debug(f"Full metadata: {metadata}")
         return False
