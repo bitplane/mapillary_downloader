@@ -17,6 +17,9 @@ def worker_process(work_queue, result_queue, worker_id):
         result_queue: Queue to push results to
         worker_id: Unique worker identifier
     """
+    # Create session once per worker (reuse HTTP connections)
+    session = requests.Session()
+
     while True:
         work_item = work_queue.get()
 
@@ -27,14 +30,17 @@ def worker_process(work_queue, result_queue, worker_id):
         # Unpack work item
         image_data, output_dir, quality, convert_webp, access_token = work_item
 
+        # Update session auth for this request
+        session.headers.update({"Authorization": f"OAuth {access_token}"})
+
         # Process the image
-        result = download_and_convert_image(image_data, output_dir, quality, convert_webp, access_token)
+        result = download_and_convert_image(image_data, output_dir, quality, convert_webp, session)
 
         # Push result back
         result_queue.put(result)
 
 
-def download_and_convert_image(image_data, output_dir, quality, convert_webp, access_token):
+def download_and_convert_image(image_data, output_dir, quality, convert_webp, session):
     """Download and optionally convert a single image.
 
     This function is designed to run in a worker process.
@@ -44,7 +50,7 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, ac
         output_dir: Base output directory path
         quality: Quality level (256, 1024, 2048, original)
         convert_webp: Whether to convert to WebP
-        access_token: Mapillary API access token
+        session: requests.Session with auth already configured
 
     Returns:
         Tuple of (image_id, bytes_downloaded, success, error_msg)
@@ -78,11 +84,7 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, ac
             jpg_path = img_dir / f"{image_id}.jpg"
             final_path = jpg_path
 
-        # Download image
-        # No retries for CDN images - they're cheap, just skip failures and move on
-        session = requests.Session()
-        session.headers.update({"Authorization": f"OAuth {access_token}"})
-
+        # Download image (using session passed from worker)
         bytes_downloaded = 0
 
         try:

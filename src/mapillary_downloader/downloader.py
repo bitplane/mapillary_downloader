@@ -181,22 +181,22 @@ class MapillaryDownloader:
 
         start_time = time.time()
 
-        # Step 1: Build seen_ids from metadata file (streaming, only IDs)
-        logger.info("Building seen_ids from metadata...")
+        # Step 1: Check if API fetch is already complete
         reader = MetadataReader(self.metadata_file)
-        seen_ids = reader.get_all_ids()
         api_complete = reader.is_complete
-        logger.info(f"Found {len(seen_ids)} existing images in metadata")
+        if api_complete:
+            logger.info("API fetch already complete, will only download")
+        else:
+            logger.info("API fetch incomplete, will fetch and download in parallel")
 
-        # Step 2: Start worker pool (fork AFTER building seen_ids, BEFORE downloading)
+        # Step 2: Start worker pool
         pool = AdaptiveWorkerPool(
             worker_process, min_workers=max(1, self.workers // 2), max_workers=self.workers, monitoring_interval=30
         )
         pool.start()
 
-        # Step 3: Download images from existing metadata while fetching new from API
+        # Step 3: Download images from metadata file while fetching new from API
         downloaded_count = 0
-        skipped = 0
         total_bytes = 0
         failed_count = 0
         submitted = 0
@@ -218,25 +218,18 @@ class MapillaryDownloader:
                         logger.info("API fetch thread: Starting...")
                         with open(self.metadata_file, "a") as meta_f:
                             for image in self.client.get_user_images(self.username, bbox=bbox):
-                                image_id = image["id"]
-
-                                # Skip if we already have this in our metadata file
-                                if image_id in seen_ids:
-                                    continue
-
-                                seen_ids.add(image_id)
                                 new_images_count[0] += 1
 
-                                # Save new metadata
+                                # Save metadata (don't dedupe here, let the tailer handle it)
                                 meta_f.write(json.dumps(image) + "\n")
                                 meta_f.flush()
 
                                 if new_images_count[0] % 1000 == 0:
-                                    logger.info(f"API: Fetched {new_images_count[0]} new images from API")
+                                    logger.info(f"API: Fetched {new_images_count[0]} images from API")
 
                             # Mark as complete
                             MetadataReader.mark_complete(self.metadata_file)
-                            logger.info(f"API fetch complete: {new_images_count[0]} new images")
+                            logger.info(f"API fetch complete: {new_images_count[0]} images")
                     finally:
                         api_fetch_complete.set()
 
@@ -438,14 +431,7 @@ class MapillaryDownloader:
         self._save_progress()
         elapsed = time.time() - start_time
 
-        # Count total images in metadata
-        total_images = len(seen_ids)
-        skipped = total_images - downloaded_count - failed_count
-
-        logger.info(
-            f"Complete! Total {total_images} images, downloaded {downloaded_count} ({format_size(total_bytes)}), "
-            f"skipped {skipped}, failed {failed_count}"
-        )
+        logger.info(f"Complete! Downloaded {downloaded_count} ({format_size(total_bytes)}), " f"failed {failed_count}")
         logger.info(f"Total time: {format_time(elapsed)}")
 
         # Tar sequence directories for efficient IA uploads
