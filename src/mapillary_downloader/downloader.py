@@ -7,11 +7,12 @@ import os
 import shutil
 import time
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from mapillary_downloader.utils import format_size, format_time
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.ia_check import check_ia_exists
-from mapillary_downloader.worker import download_and_convert_image
+from mapillary_downloader.worker import worker_process
+from mapillary_downloader.worker_pool import AdaptiveWorkerPool
+from mapillary_downloader.metadata_reader import MetadataReader
 from mapillary_downloader.tar_sequences import tar_sequence_directories
 from mapillary_downloader.logging_config import add_file_handler
 
@@ -106,23 +107,51 @@ class MapillaryDownloader:
         self.downloaded = self._load_progress()
 
     def _load_progress(self):
-        """Load previously downloaded image IDs."""
+        """Load previously downloaded image IDs for this quality."""
         if self.progress_file.exists():
             with open(self.progress_file) as f:
-                return set(json.load(f).get("downloaded", []))
+                data = json.load(f)
+                # Support both old format (single list) and new format (per-quality dict)
+                if isinstance(data, dict):
+                    if "downloaded" in data:
+                        # Old format: {"downloaded": [...]}
+                        return set(data["downloaded"])
+                    else:
+                        # New format: {"256": [...], "1024": [...], ...}
+                        return set(data.get(str(self.quality), []))
+                else:
+                    # Very old format: just a list
+                    return set(data)
         return set()
 
     def _save_progress(self):
-        """Save progress to disk atomically."""
+        """Save progress to disk atomically, per-quality."""
+        # Load existing progress for all qualities
+        if self.progress_file.exists():
+            with open(self.progress_file) as f:
+                data = json.load(f)
+                # Convert old format to new format if needed
+                if isinstance(data, dict) and "downloaded" in data:
+                    # Old format: {"downloaded": [...]} - migrate to per-quality
+                    progress = {}
+                else:
+                    progress = data if isinstance(data, dict) else {}
+        else:
+            progress = {}
+
+        # Update this quality's progress
+        progress[str(self.quality)] = list(self.downloaded)
+
+        # Write atomically
         temp_file = self.progress_file.with_suffix(".json.tmp")
         with open(temp_file, "w") as f:
-            json.dump({"downloaded": list(self.downloaded)}, f)
+            json.dump(progress, f)
             f.flush()
             os.fsync(f.fileno())
         temp_file.replace(self.progress_file)
 
     def download_user_data(self, bbox=None, convert_webp=False):
-        """Download all images for a user.
+        """Download all images for a user using streaming queue-based architecture.
 
         Args:
             bbox: Optional bounding box [west, south, east, north]
@@ -150,85 +179,271 @@ class MapillaryDownloader:
         logger.info(f"Quality: {self.quality}")
         logger.info(f"Using {self.workers} parallel workers")
 
-        processed = 0
+        start_time = time.time()
+
+        # Step 1: Build seen_ids from metadata file (streaming, only IDs)
+        logger.info("Building seen_ids from metadata...")
+        reader = MetadataReader(self.metadata_file)
+        seen_ids = reader.get_all_ids()
+        api_complete = reader.is_complete
+        logger.info(f"Found {len(seen_ids)} existing images in metadata")
+
+        # Step 2: Start worker pool (fork AFTER building seen_ids, BEFORE downloading)
+        pool = AdaptiveWorkerPool(
+            worker_process, min_workers=max(1, self.workers // 2), max_workers=self.workers, monitoring_interval=30
+        )
+        pool.start()
+
+        # Step 3: Download images from existing metadata while fetching new from API
         downloaded_count = 0
         skipped = 0
         total_bytes = 0
         failed_count = 0
+        submitted = 0
+        batch_start = time.time()
 
-        start_time = time.time()
+        logger.info("Starting parallel download and API fetch...")
 
-        # Track which image IDs we've seen in metadata to avoid re-fetching
-        seen_ids = set()
+        try:
+            # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
+            if not api_complete:
+                import threading
 
-        # Collect images to download from existing metadata
-        images_to_download = []
+                api_fetch_complete = threading.Event()
+                new_images_count = [0]  # Mutable so thread can update it
 
-        if self.metadata_file.exists():
-            logger.info("Processing existing metadata file...")
-            with open(self.metadata_file) as f:
-                for line in f:
-                    if line.strip():
-                        image = json.loads(line)
-                        image_id = image["id"]
-                        seen_ids.add(image_id)
-                        processed += 1
+                def fetch_api_metadata():
+                    """Fetch metadata from API and write to file (runs in thread)."""
+                    try:
+                        logger.info("API fetch thread: Starting...")
+                        with open(self.metadata_file, "a") as meta_f:
+                            for image in self.client.get_user_images(self.username, bbox=bbox):
+                                image_id = image["id"]
 
-                        if image_id in self.downloaded:
-                            skipped += 1
-                            continue
+                                # Skip if we already have this in our metadata file
+                                if image_id in seen_ids:
+                                    continue
 
-                        # Queue for download
-                        if image.get(quality_field):
-                            images_to_download.append(image)
+                                seen_ids.add(image_id)
+                                new_images_count[0] += 1
 
-        # Download images from existing metadata in parallel
-        if images_to_download:
-            logger.info(f"Downloading {len(images_to_download)} images from existing metadata...")
-            downloaded_count, total_bytes, failed_count = self._download_images_parallel(
-                images_to_download, convert_webp
-            )
+                                # Save new metadata
+                                meta_f.write(json.dumps(image) + "\n")
+                                meta_f.flush()
 
-        # Always check API for new images (will skip duplicates via seen_ids)
-        logger.info("Checking for new images from API...")
-        new_images = []
+                                if new_images_count[0] % 1000 == 0:
+                                    logger.info(f"API: Fetched {new_images_count[0]} new images from API")
 
-        with open(self.metadata_file, "a") as meta_f:
-            for image in self.client.get_user_images(self.username, bbox=bbox):
-                image_id = image["id"]
+                            # Mark as complete
+                            MetadataReader.mark_complete(self.metadata_file)
+                            logger.info(f"API fetch complete: {new_images_count[0]} new images")
+                    finally:
+                        api_fetch_complete.set()
 
-                # Skip if we already have this in our metadata file
-                if image_id in seen_ids:
+                # Start API fetch in background thread
+                api_thread = threading.Thread(target=fetch_api_metadata, daemon=True)
+                api_thread.start()
+            else:
+                logger.info("API fetch already complete, skipping API thread")
+                api_fetch_complete = None
+
+            # Step 3b: Tail metadata file and submit to workers
+            logger.info("Starting metadata tail and download queue feeder...")
+            last_position = 0
+
+            # Helper to process results from queue
+            def process_results():
+                nonlocal downloaded_count, total_bytes, failed_count
+                while True:
+                    result = pool.get_result(timeout=0.001)
+                    if result is None:
+                        break
+
+                    image_id, bytes_dl, success, error_msg = result
+
+                    if success:
+                        self.downloaded.add(image_id)
+                        downloaded_count += 1
+                        total_bytes += bytes_dl
+
+                        # Log every download for first 10, then every 100
+                        should_log = downloaded_count <= 10 or downloaded_count % 100 == 0
+                        if should_log:
+                            elapsed = time.time() - batch_start
+                            rate = downloaded_count / elapsed if elapsed > 0 else 0
+                            logger.info(
+                                f"Downloaded: {downloaded_count} ({format_size(total_bytes)}) "
+                                f"- Rate: {rate:.1f} images/sec"
+                            )
+
+                        if downloaded_count % 100 == 0:
+                            self._save_progress()
+                            pool.check_throughput(downloaded_count)
+                    else:
+                        failed_count += 1
+                        logger.warning(f"Failed to download {image_id}: {error_msg}")
+
+            # Tail the metadata file and submit to workers
+            while True:
+                # Check if API fetch is done and we've processed everything
+                if api_fetch_complete and api_fetch_complete.is_set():
+                    # Read any remaining lines
+                    if self.metadata_file.exists():
+                        with open(self.metadata_file) as f:
+                            f.seek(last_position)
+                            for line in f:
+                                line = line.strip()
+                                if not line:
+                                    continue
+
+                                try:
+                                    image = json.loads(line)
+                                except json.JSONDecodeError:
+                                    # Incomplete line, will retry
+                                    continue
+
+                                # Skip completion marker
+                                if image.get("__complete__"):
+                                    continue
+
+                                image_id = image.get("id")
+                                if not image_id:
+                                    continue
+
+                                # Skip if already downloaded or no quality URL
+                                if image_id in self.downloaded:
+                                    continue
+                                if not image.get(quality_field):
+                                    continue
+
+                                # Submit to workers
+                                work_item = (
+                                    image,
+                                    str(self.output_dir),
+                                    self.quality,
+                                    convert_webp,
+                                    self.client.access_token,
+                                )
+                                pool.submit(work_item)
+                                submitted += 1
+
+                                if submitted % 1000 == 0:
+                                    logger.info(f"Queue: Submitted {submitted} images")
+
+                                # Process results while submitting
+                                process_results()
+
+                            last_position = f.tell()
+
+                    # API done and all lines processed, break
+                    break
+
+                # API still running or API was already complete, tail the file
+                if self.metadata_file.exists():
+                    with open(self.metadata_file) as f:
+                        f.seek(last_position)
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+
+                            try:
+                                image = json.loads(line)
+                            except json.JSONDecodeError:
+                                # Incomplete line, will retry next iteration
+                                continue
+
+                            # Skip completion marker
+                            if image.get("__complete__"):
+                                continue
+
+                            image_id = image.get("id")
+                            if not image_id:
+                                continue
+
+                            # Skip if already downloaded or no quality URL
+                            if image_id in self.downloaded:
+                                continue
+                            if not image.get(quality_field):
+                                continue
+
+                            # Submit to workers
+                            work_item = (
+                                image,
+                                str(self.output_dir),
+                                self.quality,
+                                convert_webp,
+                                self.client.access_token,
+                            )
+                            pool.submit(work_item)
+                            submitted += 1
+
+                            if submitted % 1000 == 0:
+                                logger.info(f"Queue: Submitted {submitted} images")
+
+                            # Process results while submitting
+                            process_results()
+
+                        last_position = f.tell()
+
+                # Sleep briefly before next tail iteration
+                time.sleep(0.1)
+
+                # Process any results that came in
+                process_results()
+
+            # Send shutdown signals
+            logger.info(f"Submitted {submitted} images, waiting for workers to finish...")
+            for _ in range(pool.current_workers):
+                pool.submit(None)
+
+            # Collect remaining results
+            completed = downloaded_count + failed_count
+
+            while completed < submitted:
+                result = pool.get_result(timeout=5)
+                if result is None:
+                    # Check throughput periodically
+                    pool.check_throughput(downloaded_count)
                     continue
 
-                seen_ids.add(image_id)
-                processed += 1
+                image_id, bytes_dl, success, error_msg = result
+                completed += 1
 
-                # Save new metadata
-                meta_f.write(json.dumps(image) + "\n")
-                meta_f.flush()
+                if success:
+                    self.downloaded.add(image_id)
+                    downloaded_count += 1
+                    total_bytes += bytes_dl
 
-                # Skip if already downloaded
-                if image_id in self.downloaded:
-                    skipped += 1
-                    continue
+                    if downloaded_count % 10 == 0:
+                        elapsed = time.time() - batch_start
+                        rate = downloaded_count / elapsed if elapsed > 0 else 0
+                        remaining = submitted - completed
+                        eta_seconds = remaining / rate if rate > 0 else 0
 
-                # Queue for download
-                if image.get(quality_field):
-                    new_images.append(image)
+                        logger.info(
+                            f"Downloaded: {downloaded_count}/{submitted} ({format_size(total_bytes)}) "
+                            f"- ETA: {format_time(eta_seconds)}"
+                        )
+                        self._save_progress()
+                        pool.check_throughput(downloaded_count)
+                else:
+                    failed_count += 1
+                    logger.warning(f"Failed to download {image_id}: {error_msg}")
 
-        # Download new images in parallel
-        if new_images:
-            logger.info(f"Downloading {len(new_images)} new images...")
-            new_downloaded, new_bytes, new_failed = self._download_images_parallel(new_images, convert_webp)
-            downloaded_count += new_downloaded
-            total_bytes += new_bytes
-            failed_count += new_failed
+        finally:
+            # Shutdown worker pool
+            pool.shutdown()
 
         self._save_progress()
         elapsed = time.time() - start_time
+
+        # Count total images in metadata
+        total_images = len(seen_ids)
+        skipped = total_images - downloaded_count - failed_count
+
         logger.info(
-            f"Complete! Processed {processed} images, downloaded {downloaded_count} ({format_size(total_bytes)}), "
+            f"Complete! Total {total_images} images, downloaded {downloaded_count} ({format_size(total_bytes)}), "
             f"skipped {skipped}, failed {failed_count}"
         )
         logger.info(f"Total time: {format_time(elapsed)}")
@@ -268,59 +483,3 @@ class MapillaryDownloader:
         self.final_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(self.staging_dir), str(self.final_dir))
         logger.info(f"Collection moved to: {self.final_dir}")
-
-    def _download_images_parallel(self, images, convert_webp):
-        """Download images in parallel using worker pool.
-
-        Args:
-            images: List of image metadata dicts
-            convert_webp: Whether to convert to WebP
-
-        Returns:
-            Tuple of (downloaded_count, total_bytes, failed_count)
-        """
-        downloaded_count = 0
-        total_bytes = 0
-        failed_count = 0
-        batch_start_time = time.time()
-
-        with ProcessPoolExecutor(max_workers=self.workers) as executor:
-            # Submit all tasks
-            future_to_image = {}
-            for image in images:
-                future = executor.submit(
-                    download_and_convert_image,
-                    image,
-                    str(self.output_dir),
-                    self.quality,
-                    convert_webp,
-                    self.client.access_token,
-                )
-                future_to_image[future] = image["id"]
-
-            # Process results as they complete
-            for future in as_completed(future_to_image):
-                image_id, bytes_dl, success, error_msg = future.result()
-
-                if success:
-                    self.downloaded.add(image_id)
-                    downloaded_count += 1
-                    total_bytes += bytes_dl
-
-                    if downloaded_count % 10 == 0:
-                        # Calculate ETA
-                        elapsed = time.time() - batch_start_time
-                        rate = downloaded_count / elapsed if elapsed > 0 else 0
-                        remaining = len(images) - downloaded_count
-                        eta_seconds = remaining / rate if rate > 0 else 0
-
-                        logger.info(
-                            f"Downloaded: {downloaded_count}/{len(images)} ({format_size(total_bytes)}) "
-                            f"- ETA: {format_time(eta_seconds)}"
-                        )
-                        self._save_progress()
-                else:
-                    failed_count += 1
-                    logger.warning(f"Failed to download {image_id}: {error_msg}")
-
-        return downloaded_count, total_bytes, failed_count

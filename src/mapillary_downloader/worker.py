@@ -9,6 +9,31 @@ from mapillary_downloader.exif_writer import write_exif_to_image
 from mapillary_downloader.webp_converter import convert_to_webp
 
 
+def worker_process(work_queue, result_queue, worker_id):
+    """Worker process that pulls from queue and processes images.
+
+    Args:
+        work_queue: Queue to pull work items from
+        result_queue: Queue to push results to
+        worker_id: Unique worker identifier
+    """
+    while True:
+        work_item = work_queue.get()
+
+        # None is the shutdown signal
+        if work_item is None:
+            break
+
+        # Unpack work item
+        image_data, output_dir, quality, convert_webp, access_token = work_item
+
+        # Process the image
+        result = download_and_convert_image(image_data, output_dir, quality, convert_webp, access_token)
+
+        # Push result back
+        result_queue.put(result)
+
+
 def download_and_convert_image(image_data, output_dir, quality, convert_webp, access_token):
     """Download and optionally convert a single image.
 
