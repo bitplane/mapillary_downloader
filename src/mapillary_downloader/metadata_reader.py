@@ -23,7 +23,47 @@ class MetadataReader:
             metadata_file: Path to metadata.jsonl or metadata.jsonl.gz
         """
         self.metadata_file = Path(metadata_file)
-        self.is_complete = False
+        self.is_complete = self._check_complete()
+
+    def _check_complete(self):
+        """Check if metadata file has completion marker.
+
+        Returns:
+            True if completion marker found, False otherwise
+        """
+        if not self.metadata_file.exists():
+            return False
+
+        # Check last few lines for completion marker (it should be at the end)
+        try:
+            if self.metadata_file.suffix == ".gz":
+                file_handle = gzip.open(self.metadata_file, "rt")
+            else:
+                file_handle = open(self.metadata_file)
+
+            with file_handle as f:
+                # Read last 10 lines to find completion marker
+                lines = []
+                for line in f:
+                    lines.append(line)
+                    if len(lines) > 10:
+                        lines.pop(0)
+
+                # Check if any of the last lines is the completion marker
+                for line in reversed(lines):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if data.get("__complete__"):
+                            return True
+                    except json.JSONDecodeError:
+                        continue
+
+            return False
+        except Exception:
+            return False
 
     def iter_images(self, quality_field=None, downloaded_ids=None):
         """Stream images from metadata file with filtering.

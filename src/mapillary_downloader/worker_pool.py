@@ -17,7 +17,7 @@ class AdaptiveWorkerPool:
     - If throughput plateauing/decreasing: reduce workers
     """
 
-    def __init__(self, worker_func, min_workers=4, max_workers=16, monitoring_interval=30):
+    def __init__(self, worker_func, min_workers=4, max_workers=16, monitoring_interval=10):
         """Initialize adaptive worker pool.
 
         Args:
@@ -37,10 +37,11 @@ class AdaptiveWorkerPool:
 
         # Worker management
         self.workers = []
-        self.current_workers = min_workers
+        self.current_workers = min_workers  # Start small and ramp up
 
         # Throughput monitoring
         self.throughput_history = deque(maxlen=5)  # Last 5 measurements
+        self.worker_count_history = deque(maxlen=5)  # Track worker counts at each measurement
         self.last_processed = 0
         self.last_check_time = time.time()
 
@@ -86,36 +87,103 @@ class AdaptiveWorkerPool:
         elapsed = now - self.last_check_time
 
         if elapsed < self.monitoring_interval:
+            logger.debug(f"Throughput check skipped (elapsed {elapsed:.1f}s < {self.monitoring_interval}s)")
             return
 
         # Calculate current throughput (items/sec)
         items_since_check = total_processed - self.last_processed
         throughput = items_since_check / elapsed
 
+        current_workers = len(self.workers)
         self.throughput_history.append(throughput)
+        self.worker_count_history.append(current_workers)
         self.last_processed = total_processed
         self.last_check_time = now
 
-        # Need at least 3 measurements to detect trends
-        if len(self.throughput_history) < 3:
+        logger.info(
+            f"Throughput: {throughput:.1f} items/s (workers: {current_workers}/{self.max_workers}, "
+            f"history: {len(self.throughput_history)} measurements)"
+        )
+
+        # Need at least 2 measurements to calculate gain per worker
+        if len(self.throughput_history) < 2:
+            # First measurement - add 20% more workers
+            if current_workers < self.max_workers:
+                workers_to_add = max(1, int(current_workers * 0.2))
+                for i in range(workers_to_add):
+                    if len(self.workers) < self.max_workers:
+                        new_worker_id = len(self.workers)
+                        self._add_worker(new_worker_id)
+                        self.current_workers += 1
+                logger.info(
+                    f"Ramping up: added {workers_to_add} workers (now {self.current_workers}/{self.max_workers})"
+                )
             return
 
-        # Check if throughput is increasing
-        recent_avg = sum(list(self.throughput_history)[-2:]) / 2
-        older_avg = sum(list(self.throughput_history)[-4:-2]) / 2
+        # Calculate throughput gain per worker added
+        current_throughput = self.throughput_history[-1]
+        previous_throughput = self.throughput_history[-2]
+        previous_workers = self.worker_count_history[-2]
 
-        if recent_avg > older_avg * 1.1 and len(self.workers) < self.max_workers:
-            # Throughput increasing by >10%, add workers
-            new_worker_id = len(self.workers)
-            self._add_worker(new_worker_id)
-            self.current_workers += 1
-            logger.info(f"Throughput increasing ({throughput:.1f} items/s), added worker (now {self.current_workers})")
+        throughput_gain = current_throughput - previous_throughput
+        workers_added = current_workers - previous_workers
 
-        elif recent_avg < older_avg * 0.9 and len(self.workers) > self.min_workers:
-            # Throughput decreasing by >10%, remove worker
-            # (workers will exit naturally when they finish current work)
-            self.current_workers = max(self.min_workers, self.current_workers - 1)
-            logger.info(f"Throughput plateauing ({throughput:.1f} items/s), reducing to {self.current_workers} workers")
+        logger.debug(
+            f"Trend: {previous_throughput:.1f} items/s @ {previous_workers} workers → "
+            f"{current_throughput:.1f} items/s @ {current_workers} workers "
+            f"(gain: {throughput_gain:.1f}, added: {workers_added})"
+        )
+
+        # If throughput decreased significantly, stop adding workers
+        if current_throughput < previous_throughput * 0.95:
+            logger.info(
+                f"Throughput decreasing ({current_throughput:.1f} vs {previous_throughput:.1f} items/s), "
+                f"stopping at {current_workers} workers"
+            )
+        # If throughput is still increasing or stable, add more workers
+        elif current_throughput >= previous_throughput * 0.95 and current_workers < self.max_workers:
+            if workers_added > 0 and throughput_gain > 0:
+                # Calculate gain per worker
+                gain_per_worker = throughput_gain / workers_added
+                logger.debug(f"Gain per worker: {gain_per_worker:.2f} items/s")
+
+                # Estimate how many more workers we could benefit from
+                # Assume diminishing returns, so be conservative
+                if gain_per_worker > 0.5:
+                    # Good gain per worker - add more aggressively
+                    workers_to_add = max(1, int(current_workers * 0.3))
+                elif gain_per_worker > 0.2:
+                    # Moderate gain - add moderately
+                    workers_to_add = max(1, int(current_workers * 0.2))
+                else:
+                    # Small gain - add conservatively
+                    workers_to_add = max(1, int(current_workers * 0.1))
+
+                added = 0
+                for i in range(workers_to_add):
+                    if len(self.workers) < self.max_workers:
+                        new_worker_id = len(self.workers)
+                        self._add_worker(new_worker_id)
+                        self.current_workers += 1
+                        added += 1
+
+                logger.info(
+                    f"Throughput increasing (gain: {gain_per_worker:.2f} items/s per worker), "
+                    f"added {added} workers (now {self.current_workers}/{self.max_workers})"
+                )
+            else:
+                # Fallback to 20% if we can't calculate gain per worker
+                workers_to_add = max(1, int(current_workers * 0.2))
+                added = 0
+                for i in range(workers_to_add):
+                    if len(self.workers) < self.max_workers:
+                        new_worker_id = len(self.workers)
+                        self._add_worker(new_worker_id)
+                        self.current_workers += 1
+                        added += 1
+                logger.info(f"Ramping up: added {added} workers (now {self.current_workers}/{self.max_workers})")
+        else:
+            logger.info(f"At optimal worker count: {current_workers} workers, {current_throughput:.1f} items/s")
 
     def shutdown(self, timeout=30):
         """Shutdown the worker pool gracefully."""

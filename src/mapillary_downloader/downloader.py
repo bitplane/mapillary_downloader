@@ -190,9 +190,9 @@ class MapillaryDownloader:
             logger.info("API fetch incomplete, will fetch and download in parallel")
 
         # Step 2: Start worker pool
-        pool = AdaptiveWorkerPool(
-            worker_process, min_workers=max(1, self.workers // 2), max_workers=self.workers, monitoring_interval=30
-        )
+        # Since workers do both I/O (download) and CPU (WebP), need many more workers
+        # Cap at 128 for now - will build proper dynamic scaling on a new branch later
+        pool = AdaptiveWorkerPool(worker_process, min_workers=self.workers, max_workers=128, monitoring_interval=10)
         pool.start()
 
         # Step 3: Download images from metadata file while fetching new from API
