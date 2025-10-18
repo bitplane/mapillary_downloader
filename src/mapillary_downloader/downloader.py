@@ -45,7 +45,7 @@ class MapillaryDownloader:
         output_dir,
         username=None,
         quality=None,
-        workers=None,
+        max_workers=128,
         tar_sequences=True,
         convert_webp=False,
         check_ia=True,
@@ -57,7 +57,7 @@ class MapillaryDownloader:
             output_dir: Base directory to save downloads (final destination)
             username: Mapillary username (for collection directory)
             quality: Image quality (for collection directory)
-            workers: Number of parallel workers (default: half of cpu_count)
+            max_workers: Maximum number of parallel workers (default: 128)
             tar_sequences: Whether to tar sequence directories after download (default: True)
             convert_webp: Whether to convert images to WebP (affects collection name)
             check_ia: Whether to check if collection exists on Internet Archive (default: True)
@@ -66,7 +66,8 @@ class MapillaryDownloader:
         self.base_output_dir = Path(output_dir)
         self.username = username
         self.quality = quality
-        self.workers = workers if workers is not None else max(1, os.cpu_count() // 2)
+        self.max_workers = max_workers
+        self.initial_workers = os.cpu_count() or 1  # Start with CPU count
         self.tar_sequences = tar_sequences
         self.convert_webp = convert_webp
         self.check_ia = check_ia
@@ -177,7 +178,7 @@ class MapillaryDownloader:
         logger.info(f"Downloading images for user: {self.username}")
         logger.info(f"Output directory: {self.output_dir}")
         logger.info(f"Quality: {self.quality}")
-        logger.info(f"Using {self.workers} parallel workers")
+        logger.info(f"Worker pool: {self.initial_workers} initial, {self.max_workers} max")
 
         start_time = time.time()
 
@@ -191,8 +192,10 @@ class MapillaryDownloader:
 
         # Step 2: Start worker pool
         # Since workers do both I/O (download) and CPU (WebP), need many more workers
-        # Cap at 128 for now - will build proper dynamic scaling on a new branch later
-        pool = AdaptiveWorkerPool(worker_process, min_workers=self.workers, max_workers=128, monitoring_interval=10)
+        # Start with CPU count and scale up based on throughput
+        pool = AdaptiveWorkerPool(
+            worker_process, min_workers=self.initial_workers, max_workers=self.max_workers, monitoring_interval=10
+        )
         pool.start()
 
         # Step 3: Download images from metadata file while fetching new from API

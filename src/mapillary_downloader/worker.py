@@ -1,6 +1,7 @@
 """Worker process for parallel image download and conversion."""
 
 import os
+import signal
 import tempfile
 from pathlib import Path
 import requests
@@ -17,6 +18,9 @@ def worker_process(work_queue, result_queue, worker_id):
         result_queue: Queue to push results to
         worker_id: Unique worker identifier
     """
+    # Ignore SIGINT in worker process - parent will handle it
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
     # Create session once per worker (reuse HTTP connections)
     session = requests.Session()
 

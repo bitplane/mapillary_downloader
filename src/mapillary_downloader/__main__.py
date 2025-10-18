@@ -41,10 +41,10 @@ def main():
         help="Don't convert to WebP (WebP conversion is enabled by default, saves ~70%% disk space)",
     )
     parser.add_argument(
-        "--workers",
+        "--max-workers",
         type=int,
-        default=None,
-        help="Number of parallel workers (default: half of CPU cores)",
+        default=128,
+        help="Maximum number of parallel workers (default: 128)",
     )
     parser.add_argument(
         "--no-tar",
@@ -114,7 +114,7 @@ def main():
                 args.output,
                 username,
                 args.quality,
-                workers=args.workers,
+                max_workers=args.max_workers,
                 tar_sequences=not args.no_tar,
                 convert_webp=convert_webp,
                 check_ia=not args.no_check_ia,

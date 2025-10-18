@@ -185,20 +185,18 @@ class AdaptiveWorkerPool:
         else:
             logger.info(f"At optimal worker count: {current_workers} workers, {current_throughput:.1f} items/s")
 
-    def shutdown(self, timeout=30):
+    def shutdown(self, timeout=2):
         """Shutdown the worker pool gracefully."""
         logger.info("Shutting down worker pool...")
         self.running = False
 
-        # Send stop signals
-        for _ in self.workers:
-            self.work_queue.put(None)
+        # Terminate all workers immediately (they ignore SIGINT so we need to be forceful)
+        for p in self.workers:
+            if p.is_alive():
+                p.terminate()
 
-        # Wait for workers to finish
+        # Give them a brief moment to exit
         for p in self.workers:
             p.join(timeout=timeout)
-            if p.is_alive():
-                logger.warning(f"Worker {p.pid} did not exit cleanly, terminating")
-                p.terminate()
 
         logger.info("Worker pool shutdown complete")
