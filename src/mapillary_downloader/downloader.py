@@ -250,8 +250,9 @@ class MapillaryDownloader:
             # Helper to process results from queue
             def process_results():
                 nonlocal downloaded_count, total_bytes, failed_count
+                # Drain ALL available results to prevent queue from filling up
                 while True:
-                    result = pool.get_result(timeout=0.001)
+                    result = pool.get_result(timeout=0)  # Non-blocking
                     if result is None:
                         break
 
@@ -381,6 +382,10 @@ class MapillaryDownloader:
                             process_results()
 
                         last_position = f.tell()
+
+                # If API is already complete, we've read the whole file, so break
+                if api_fetch_complete is None:
+                    break
 
                 # Sleep briefly before next tail iteration
                 time.sleep(0.1)
