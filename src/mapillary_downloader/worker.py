@@ -69,11 +69,13 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
         if not image_url:
             return (image_id, 0, False, f"No {quality} URL")
 
-        # Determine final output directory
+        # Determine final output directory - organize by first char of sequence ID
         output_dir = Path(output_dir)
         sequence_id = image_data.get("sequence")
         if sequence_id:
-            img_dir = output_dir / sequence_id
+            # Use first character as bucket (gives us ~62 dirs instead of millions)
+            first_char = sequence_id[0]
+            img_dir = output_dir / first_char / sequence_id
             img_dir.mkdir(parents=True, exist_ok=True)
         else:
             img_dir = output_dir

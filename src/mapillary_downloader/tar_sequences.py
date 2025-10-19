@@ -24,12 +24,21 @@ def tar_sequence_directories(collection_dir):
         return 0, 0
 
     # Find all sequence directories (skip special dirs)
+    # Now organized as first_char/sequence_id/ due to bucketing
     skip_dirs = {".meta", "__pycache__"}
     sequence_dirs = []
 
-    for item in collection_dir.iterdir():
-        if item.is_dir() and item.name not in skip_dirs:
-            sequence_dirs.append(item)
+    for bucket_dir in collection_dir.iterdir():
+        if bucket_dir.is_dir() and bucket_dir.name not in skip_dirs:
+            # Check if this is a bucket dir (single char) or a sequence dir (for backward compat)
+            if len(bucket_dir.name) == 1:
+                # This is a bucket dir, look for sequences inside it
+                for seq_dir in bucket_dir.iterdir():
+                    if seq_dir.is_dir() and seq_dir.name not in skip_dirs:
+                        sequence_dirs.append(seq_dir)
+            else:
+                # Old format - sequence dir directly under collection_dir
+                sequence_dirs.append(bucket_dir)
 
     if not sequence_dirs:
         logger.info("No sequence directories to tar")
