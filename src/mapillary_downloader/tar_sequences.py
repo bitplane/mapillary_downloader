@@ -23,60 +23,43 @@ def tar_sequence_directories(collection_dir):
         logger.error(f"Collection directory not found: {collection_dir}")
         return 0, 0
 
-    # Find all sequence directories (skip special dirs)
-    # Now organized as first_char/sequence_id/ due to bucketing
+    # Find all bucket directories (skip special dirs)
+    # Now we tar entire bucket dirs (e.g., a/, b/, etc) to get ~62 tar files
     skip_dirs = {".meta", "__pycache__"}
-    sequence_dirs = []
+    bucket_dirs = []
 
-    for bucket_dir in collection_dir.iterdir():
-        if bucket_dir.is_dir() and bucket_dir.name not in skip_dirs:
-            # Check if this is a bucket dir (single char) or a sequence dir (for backward compat)
-            if len(bucket_dir.name) == 1:
-                # This is a bucket dir, look for sequences inside it
-                for seq_dir in bucket_dir.iterdir():
-                    if seq_dir.is_dir() and seq_dir.name not in skip_dirs:
-                        sequence_dirs.append(seq_dir)
-            else:
-                # Old format - sequence dir directly under collection_dir
-                sequence_dirs.append(bucket_dir)
+    for item in collection_dir.iterdir():
+        if item.is_dir() and item.name not in skip_dirs:
+            # Check if this is a bucket dir (single char)
+            if len(item.name) == 1:
+                bucket_dirs.append(item)
 
-    if not sequence_dirs:
-        logger.info("No sequence directories to tar")
+    if not bucket_dirs:
+        logger.info("No bucket directories to tar")
         return 0, 0
 
-    logger.info(f"Tarring {len(sequence_dirs)} sequence directories...")
+    logger.info(f"Tarring {len(bucket_dirs)} bucket directories...")
 
     tarred_count = 0
     total_files = 0
     total_tar_bytes = 0
 
-    for seq_dir in sequence_dirs:
-        seq_name = seq_dir.name
-        tar_path = collection_dir / f"{seq_name}.tar"
+    for bucket_dir in bucket_dirs:
+        bucket_name = bucket_dir.name
+        tar_path = collection_dir / f"{bucket_name}.tar"
 
-        # Handle naming collision - find next available name
-        counter = 1
-        while tar_path.exists():
-            counter += 1
-            tar_path = collection_dir / f"{seq_name}.{counter}.tar"
-
-        # Count files in sequence
-        files = list(seq_dir.glob("*"))
-        file_count = len([f for f in files if f.is_file()])
+        # Count files in bucket
+        files_to_tar = sorted([f for f in bucket_dir.rglob("*") if f.is_file()], key=lambda x: str(x))
+        file_count = len(files_to_tar)
 
         if file_count == 0:
-            logger.warning(f"Skipping empty directory: {seq_name}")
+            logger.warning(f"Skipping empty bucket directory: {bucket_name}")
             continue
 
         try:
+            logger.info(f"Tarring bucket '{bucket_name}' ({file_count} files)...")
+
             # Create reproducible uncompressed tar (WebP already compressed)
-            # Sort files by name for deterministic ordering
-            files_to_tar = sorted([f for f in seq_dir.rglob("*") if f.is_file()], key=lambda x: x.name)
-
-            if not files_to_tar:
-                logger.warning(f"Skipping directory with no files: {seq_name}")
-                continue
-
             with tarfile.open(tar_path, "w") as tar:
                 for file_path in files_to_tar:
                     # Get path relative to collection_dir for tar archive
@@ -101,33 +84,32 @@ def tar_sequence_directories(collection_dir):
                 tar_size = tar_path.stat().st_size
                 total_tar_bytes += tar_size
 
-                # Remove original directory
-                for file in seq_dir.rglob("*"):
+                # Remove original bucket directory
+                for file in bucket_dir.rglob("*"):
                     if file.is_file():
                         file.unlink()
 
                 # Remove empty subdirs and main dir
-                for subdir in list(seq_dir.rglob("*")):
+                for subdir in list(bucket_dir.rglob("*")):
                     if subdir.is_dir():
                         try:
                             subdir.rmdir()
                         except OSError:
                             pass  # Not empty yet
 
-                seq_dir.rmdir()
+                bucket_dir.rmdir()
 
                 tarred_count += 1
                 total_files += file_count
 
-                if tarred_count % 10 == 0:
-                    logger.info(f"Tarred {tarred_count}/{len(sequence_dirs)} sequences...")
+                logger.info(f"Tarred bucket '{bucket_name}': {file_count:,} files, {format_size(tar_size)}")
             else:
                 logger.error(f"Tar file empty or not created: {tar_path}")
                 if tar_path.exists():
                     tar_path.unlink()
 
         except Exception as e:
-            logger.error(f"Error tarring {seq_name}: {e}")
+            logger.error(f"Error tarring bucket {bucket_name}: {e}")
             if tar_path.exists():
                 tar_path.unlink()
 
