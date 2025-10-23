@@ -1,6 +1,6 @@
 [project]
 name = "mapillary_downloader"
-description = "Download your Mapillary data before it's gone"
+description = "Archive user data from Mapillary"
 version = "0.6.1"
 authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
