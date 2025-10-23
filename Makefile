@@ -1,6 +1,6 @@
 # the things that don't have output files or run every time
 .PHONY: help all install test dev coverage clean docs \
-		pre-commit update-pre-commit
+		pre-commit update-pre-commit dist release
 
 
 PROJECT_NAME := mapillary_downloader
