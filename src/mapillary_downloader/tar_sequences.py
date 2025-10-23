@@ -38,6 +38,9 @@ def tar_sequence_directories(collection_dir):
         logger.info("No bucket directories to tar")
         return 0, 0
 
+    # Sort bucket directories alphabetically for consistent progress tracking
+    bucket_dirs = sorted(bucket_dirs, key=lambda x: x.name)
+
     logger.info(f"Tarring {len(bucket_dirs)} bucket directories...")
 
     tarred_count = 0
