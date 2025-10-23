@@ -7,7 +7,7 @@ import os
 import shutil
 import time
 from pathlib import Path
-from mapillary_downloader.utils import format_size, format_time
+from mapillary_downloader.utils import format_size, format_time, safe_json_save
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.ia_check import check_ia_exists
 from mapillary_downloader.worker import worker_process
@@ -143,13 +143,8 @@ class MapillaryDownloader:
         # Update this quality's progress
         progress[str(self.quality)] = list(self.downloaded)
 
-        # Write atomically
-        temp_file = self.progress_file.with_suffix(".json.tmp")
-        with open(temp_file, "w") as f:
-            json.dump(progress, f)
-            f.flush()
-            os.fsync(f.fileno())
-        temp_file.replace(self.progress_file)
+        # Write atomically using utility function
+        safe_json_save(self.progress_file, progress)
 
     def download_user_data(self, bbox=None, convert_webp=False):
         """Download all images for a user using streaming queue-based architecture.

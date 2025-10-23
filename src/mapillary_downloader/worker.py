@@ -5,9 +5,9 @@ import signal
 import tempfile
 from pathlib import Path
 import requests
-from requests.exceptions import RequestException
 from mapillary_downloader.exif_writer import write_exif_to_image
 from mapillary_downloader.webp_converter import convert_to_webp
+from mapillary_downloader.utils import http_get_with_retry
 
 
 def worker_process(work_queue, result_queue, worker_id):
@@ -90,19 +90,18 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
             jpg_path = img_dir / f"{image_id}.jpg"
             final_path = jpg_path
 
-        # Download image (using session passed from worker)
+        # Download image with retry logic
         bytes_downloaded = 0
 
         try:
-            # 60 second timeout for entire download (connection + read)
-            response = session.get(image_url, stream=True, timeout=60)
-            response.raise_for_status()
+            # Use retry logic with 3 attempts for image downloads
+            response = http_get_with_retry(image_url, max_retries=3, base_delay=1.0, timeout=60)
 
             with open(jpg_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
                     bytes_downloaded += len(chunk)
-        except RequestException as e:
+        except Exception as e:
             return (image_id, 0, False, f"Download failed: {e}")
 
         # Write EXIF metadata

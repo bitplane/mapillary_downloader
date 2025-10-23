@@ -26,7 +26,7 @@ def main():
         default=os.environ.get("MAPILLARY_TOKEN"),
         help="Mapillary API access token (or set MAPILLARY_TOKEN env var)",
     )
-    parser.add_argument("usernames", nargs="+", help="Mapillary username(s) to download")
+    parser.add_argument("usernames", nargs="*", help="Mapillary username(s) to download")
     parser.add_argument("--output", default="./mapillary_data", help="Output directory (default: ./mapillary_data)")
     parser.add_argument(
         "--quality",
@@ -61,8 +61,20 @@ def main():
         action="store_true",
         help="Enable debug logging (EXIF data, API responses, etc.)",
     )
+    parser.add_argument(
+        "--stats",
+        action="store_true",
+        help="Show statistics of collections on archive.org and exit",
+    )
 
     args = parser.parse_args()
+
+    # Handle --stats early (before token check)
+    if args.stats:
+        from mapillary_downloader.ia_stats import show_stats
+
+        show_stats()
+        sys.exit(0)
 
     # Set debug logging level if requested
     if args.debug:
@@ -70,6 +82,11 @@ def main():
 
         logging.getLogger("mapillary_downloader").setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
+
+    # Check for usernames (required unless using --stats)
+    if not args.usernames:
+        logger.error("Error: At least one username is required")
+        sys.exit(1)
 
     # Check for token
     if not args.token:
