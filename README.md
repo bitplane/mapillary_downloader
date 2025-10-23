@@ -36,8 +36,8 @@ mapillary-downloader --output ./downloads USERNAME1
 | `--quality`     | 256, 1024, 2048 or original                  | `original`         |
 | `--bbox`        | `west,south,east,north`                      | `None`             |
 | `--no-webp`     | Don't convert to WebP                        | `False`            |
-| `--workers`     | Number of parallel download workers          | Half of CPU count  |
-| `--no-tar`      | Don't tar sequence directories               | `False`            |
+| `--max-workers` | Maximum number of parallel download workers  | `128`              |
+| `--no-tar`      | Don't tar bucket directories                 | `False`            |
 | `--no-check-ia` | Don't check if exists on Internet Archive    | `False`            |
 
 The downloader will:
@@ -68,11 +68,23 @@ To disable WebP conversion and keep original JPEGs, use `--no-webp`:
 mapillary-downloader --no-webp USERNAME
 ```
 
-## Sequence Tarball Creation
+## Tarballs
 
-By default, sequence directories are automatically tarred after download because
-if they weren't, you'd spend more time setting up upload metadata than actually
-uploading files to IA.
+Images are organized by sequence ID, bucketed by the first character of the
+sequence to reduce directory count:
+
+```
+mapillary-username-quality/
+  a/
+    abc123/
+      image1.webp
+      image2.webp
+```
+
+By default, these bucket directories are automatically tarred after download
+(resulting in `a.tar`, `b.tar`, etc. - about 62 tar files total). This is done
+because large collections with millions of images would otherwise create hundreds
+of thousands of tiny tars, and anger the archive gods.
 
 To keep individual files instead of creating tars, use the `--no-tar` flag.
 
