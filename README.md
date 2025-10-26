@@ -98,8 +98,15 @@ See inlay for details:
 
 * [📀 rip](https://bitplane.net/dev/sh/rip)
 
+## 📊 Stats
 
-## Development
+To see overall project progress, or an estimate, use `--stats`
+
+```bash
+mapillary-downloader --stats
+```
+
+## 🚧 Development
 
 ```bash
 make dev      # Setup dev environment
@@ -108,7 +115,7 @@ make dist     # Build the distribution
 make help     # See other make options
 ```
 
-## Links
+## 🔗 Links
 
 * [🏠 home](https://bitplane.net/dev/python/mapillary_downloader)
   * [📖 pydoc](https://bitplane.net/dev/python/mapillary_downloader/pydoc)
