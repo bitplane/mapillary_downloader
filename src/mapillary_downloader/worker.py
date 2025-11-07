@@ -3,6 +3,7 @@
 import os
 import signal
 import tempfile
+from datetime import datetime
 from pathlib import Path
 import requests
 from mapillary_downloader.exif_writer import write_exif_to_image
@@ -69,16 +70,25 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
         if not image_url:
             return (image_id, 0, False, f"No {quality} URL")
 
-        # Determine final output directory - organize by first char of sequence ID
+        # Determine final output directory - organize by capture date
         output_dir = Path(output_dir)
         sequence_id = image_data.get("sequence")
+
+        # Extract date from captured_at timestamp (milliseconds since epoch)
+        captured_at = image_data.get("captured_at")
+        if captured_at:
+            # Convert to UTC date string (YYYY-MM-DD)
+            date_str = datetime.utcfromtimestamp(captured_at / 1000).strftime("%Y-%m-%d")
+        else:
+            # Fallback for missing timestamp (should be rare per API docs)
+            date_str = "unknown-date"
+
         if sequence_id:
-            # Use first character as bucket (gives us ~62 dirs instead of millions)
-            first_char = sequence_id[0]
-            img_dir = output_dir / first_char / sequence_id
+            img_dir = output_dir / date_str / sequence_id
             img_dir.mkdir(parents=True, exist_ok=True)
         else:
-            img_dir = output_dir
+            img_dir = output_dir / date_str
+            img_dir.mkdir(parents=True, exist_ok=True)
 
         # If converting to WebP, use /tmp for intermediate JPEG
         # Otherwise write JPEG directly to final location

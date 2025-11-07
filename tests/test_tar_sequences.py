@@ -7,51 +7,55 @@ from mapillary_downloader.tar_sequences import tar_sequence_directories
 
 
 def test_tar_sequences_basic(tmp_path):
-    """Test basic tar creation with bucketed structure."""
-    # Create a collection directory with bucketed sequences
+    """Test basic tar creation with date-based structure."""
+    # Create a collection directory with date-organized sequences
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    # Create bucket directory 's' with sequences inside
-    bucket_dir = collection / "s"
-    bucket_dir.mkdir()
+    # Create date directory '2024-01-15' with sequences inside
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
 
-    seq_dir1 = bucket_dir / "seq_123"
+    seq_dir1 = date_dir / "seq_123"
     seq_dir1.mkdir()
     (seq_dir1 / "image1.webp").write_bytes(b"fake image 1")
     (seq_dir1 / "image2.webp").write_bytes(b"fake image 2")
 
-    seq_dir2 = bucket_dir / "seq_456"
+    seq_dir2 = date_dir / "seq_456"
     seq_dir2.mkdir()
     (seq_dir2 / "image3.webp").write_bytes(b"fake image 3")
 
-    # Tar the buckets
+    # Tar the date directories
     tarred_count, total_files = tar_sequence_directories(collection)
 
-    assert tarred_count == 1  # One bucket tarred
+    assert tarred_count == 1  # One date tarred
     assert total_files == 3  # Three images total
 
-    # Check tar file exists and original bucket directory is gone
-    tar_path = collection / "s.tar"
+    # Check tar file exists and original date directory is gone
+    tar_path = collection / "2024-01-15.tar"
     assert tar_path.exists()
-    assert not bucket_dir.exists()
+    assert not date_dir.exists()
 
     # Verify tar contents
     with tarfile.open(tar_path) as tar:
         members = tar.getmembers()
         assert len(members) == 3
         names = sorted([m.name for m in members])
-        assert names == ["s/seq_123/image1.webp", "s/seq_123/image2.webp", "s/seq_456/image3.webp"]
+        assert names == [
+            "2024-01-15/seq_123/image1.webp",
+            "2024-01-15/seq_123/image2.webp",
+            "2024-01-15/seq_456/image3.webp",
+        ]
 
 
 def test_tar_sequences_empty_directory(tmp_path):
-    """Test that empty bucket directories are skipped."""
+    """Test that empty date directories are skipped."""
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    # Create empty bucket directory
-    bucket_dir = collection / "e"
-    bucket_dir.mkdir()
+    # Create empty date directory
+    date_dir = collection / "2024-01-20"
+    date_dir.mkdir()
 
     tarred_count, total_files = tar_sequence_directories(collection)
 
@@ -59,8 +63,8 @@ def test_tar_sequences_empty_directory(tmp_path):
     assert total_files == 0
 
     # Directory should still exist, no tar created
-    assert bucket_dir.exists()
-    assert not (collection / "e.tar").exists()
+    assert date_dir.exists()
+    assert not (collection / "2024-01-20.tar").exists()
 
 
 def test_tar_sequences_skip_meta_dirs(tmp_path):
@@ -73,10 +77,10 @@ def test_tar_sequences_skip_meta_dirs(tmp_path):
     meta_dir.mkdir()
     (meta_dir / "metadata.txt").write_text("test")
 
-    # Create normal bucket with sequence
-    bucket_dir = collection / "s"
-    bucket_dir.mkdir()
-    seq_dir = bucket_dir / "seq_456"
+    # Create normal date directory with sequence
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_456"
     seq_dir.mkdir()
     (seq_dir / "image.webp").write_bytes(b"test")
 
@@ -90,17 +94,17 @@ def test_tar_sequences_skip_meta_dirs(tmp_path):
     assert meta_dir.exists()
 
 
-def test_tar_sequences_hyphen_bucket(tmp_path):
-    """Test that bucket with hyphen prefix is handled correctly."""
+def test_tar_sequences_unknown_date(tmp_path):
+    """Test that unknown-date bucket is handled correctly."""
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    # Create bucket with hyphen (underscore bucket in reality)
-    bucket_dir = collection / "_"
-    bucket_dir.mkdir()
+    # Create unknown-date directory
+    unknown_dir = collection / "unknown-date"
+    unknown_dir.mkdir()
 
     # Create sequence inside
-    seq_dir = bucket_dir / "-Ojz1iTmlAFeHfns_tWhww"
+    seq_dir = unknown_dir / "seq_no_timestamp"
     seq_dir.mkdir()
     (seq_dir / "image.webp").write_bytes(b"test image")
 
@@ -109,9 +113,9 @@ def test_tar_sequences_hyphen_bucket(tmp_path):
     assert tarred_count == 1
     assert total_files == 1
 
-    tar_path = collection / "_.tar"
+    tar_path = collection / "unknown-date.tar"
     assert tar_path.exists()
-    assert not bucket_dir.exists()
+    assert not unknown_dir.exists()
 
 
 def test_tar_reproducibility(tmp_path):
@@ -122,9 +126,9 @@ def test_tar_reproducibility(tmp_path):
     # Create first collection
     collection1 = tmp_path / "collection1"
     collection1.mkdir()
-    bucket1 = collection1 / "s"
-    bucket1.mkdir()
-    seq1 = bucket1 / "seq_789"
+    date1 = collection1 / "2024-01-15"
+    date1.mkdir()
+    seq1 = date1 / "seq_789"
     seq1.mkdir()
     (seq1 / "image1.webp").write_bytes(b"test content 1")
     (seq1 / "image2.webp").write_bytes(b"test content 2")
@@ -135,15 +139,15 @@ def test_tar_reproducibility(tmp_path):
         os.utime(f, (mtime, mtime))
 
     tar_sequence_directories(collection1)
-    tar1_path = collection1 / "s.tar"
+    tar1_path = collection1 / "2024-01-15.tar"
     tar1_hash = hashlib.sha256(tar1_path.read_bytes()).hexdigest()
 
     # Create second identical collection
     collection2 = tmp_path / "collection2"
     collection2.mkdir()
-    bucket2 = collection2 / "s"
-    bucket2.mkdir()
-    seq2 = bucket2 / "seq_789"
+    date2 = collection2 / "2024-01-15"
+    date2.mkdir()
+    seq2 = date2 / "seq_789"
     seq2.mkdir()
     (seq2 / "image1.webp").write_bytes(b"test content 1")
     (seq2 / "image2.webp").write_bytes(b"test content 2")
@@ -153,7 +157,7 @@ def test_tar_reproducibility(tmp_path):
         os.utime(f, (mtime, mtime))
 
     tar_sequence_directories(collection2)
-    tar2_path = collection2 / "s.tar"
+    tar2_path = collection2 / "2024-01-15.tar"
     tar2_hash = hashlib.sha256(tar2_path.read_bytes()).hexdigest()
 
     # Hashes should be identical
@@ -165,14 +169,14 @@ def test_tar_normalized_ownership(tmp_path):
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    bucket_dir = collection / "s"
-    bucket_dir.mkdir()
-    seq_dir = bucket_dir / "seq_ownership"
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_ownership"
     seq_dir.mkdir()
     (seq_dir / "image.webp").write_bytes(b"test")
 
     tar_sequence_directories(collection)
-    tar_path = collection / "s.tar"
+    tar_path = collection / "2024-01-15.tar"
 
     # Verify ownership is normalized
     with tarfile.open(tar_path) as tar:
@@ -188,9 +192,9 @@ def test_tar_file_ordering(tmp_path):
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    bucket_dir = collection / "s"
-    bucket_dir.mkdir()
-    seq_dir = bucket_dir / "seq_order"
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_order"
     seq_dir.mkdir()
 
     # Create files in non-alphabetical order
@@ -199,7 +203,7 @@ def test_tar_file_ordering(tmp_path):
     (seq_dir / "mmm.webp").write_bytes(b"m")
 
     tar_sequence_directories(collection)
-    tar_path = collection / "s.tar"
+    tar_path = collection / "2024-01-15.tar"
 
     # Verify files are in sorted order in tar
     with tarfile.open(tar_path) as tar:
@@ -209,16 +213,16 @@ def test_tar_file_ordering(tmp_path):
         assert names == sorted(names)
 
 
-def test_tar_multiple_buckets(tmp_path):
-    """Test tarring multiple buckets."""
+def test_tar_multiple_dates(tmp_path):
+    """Test tarring multiple date directories in chronological order."""
     collection = tmp_path / "mapillary-test-original"
     collection.mkdir()
 
-    # Create multiple buckets
-    for bucket_name in ["a", "m", "z"]:
-        bucket_dir = collection / bucket_name
-        bucket_dir.mkdir()
-        seq_dir = bucket_dir / f"seq_{bucket_name}"
+    # Create multiple date directories
+    for date_name in ["2024-01-15", "2024-03-20", "2024-02-10"]:
+        date_dir = collection / date_name
+        date_dir.mkdir()
+        seq_dir = date_dir / f"seq_{date_name}"
         seq_dir.mkdir()
         (seq_dir / "image.webp").write_bytes(b"test")
 
@@ -227,12 +231,12 @@ def test_tar_multiple_buckets(tmp_path):
     assert tarred_count == 3
     assert total_files == 3
 
-    # All three buckets should be tarred
-    assert (collection / "a.tar").exists()
-    assert (collection / "m.tar").exists()
-    assert (collection / "z.tar").exists()
+    # All three dates should be tarred
+    assert (collection / "2024-01-15.tar").exists()
+    assert (collection / "2024-02-10.tar").exists()
+    assert (collection / "2024-03-20.tar").exists()
 
-    # Bucket directories should be gone
-    assert not (collection / "a").exists()
-    assert not (collection / "m").exists()
-    assert not (collection / "z").exists()
+    # Date directories should be gone
+    assert not (collection / "2024-01-15").exists()
+    assert not (collection / "2024-02-10").exists()
+    assert not (collection / "2024-03-20").exists()

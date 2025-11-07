@@ -70,21 +70,28 @@ mapillary-downloader --no-webp USERNAME
 
 ## Tarballs
 
-Images are organized by sequence ID, bucketed by the first character of the
-sequence to reduce directory count:
+Images are organized by capture date (YYYY-MM-DD) for incremental archiving:
 
 ```
 mapillary-username-quality/
-  a/
+  2024-01-15/
     abc123/
       image1.webp
       image2.webp
+    bcd456/
+      image3.webp
+  2024-01-16/
+    def789/
+      image4.webp
 ```
 
-By default, these bucket directories are automatically tarred after download
-(resulting in `a.tar`, `b.tar`, etc. - about 62 tar files total). This is done
-because large collections with millions of images would otherwise create hundreds
-of thousands of tiny tars, and anger the archive gods.
+By default, these date directories are automatically tarred after download
+(resulting in `2024-01-15.tar`, `2024-01-16.tar`, etc.). This date-based
+organization enables:
+
+- **Incremental uploads** - Upload each day's tar as soon as it's ready
+- **Manageable file counts** - ~365 days/year × 10 years = 3,650 tars max
+- **Chronological organization** - Natural sorting and progress tracking
 
 To keep individual files instead of creating tars, use the `--no-tar` flag.
 
