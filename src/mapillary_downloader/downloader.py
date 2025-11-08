@@ -67,7 +67,6 @@ class MapillaryDownloader:
         self.username = username
         self.quality = quality
         self.max_workers = max_workers
-        self.initial_workers = os.cpu_count() or 1  # Start with CPU count
         self.tar_sequences = tar_sequences
         self.convert_webp = convert_webp
         self.check_ia = check_ia
@@ -173,7 +172,7 @@ class MapillaryDownloader:
         logger.info(f"Downloading images for user: {self.username}")
         logger.info(f"Output directory: {self.output_dir}")
         logger.info(f"Quality: {self.quality}")
-        logger.info(f"Worker pool: {self.initial_workers} initial, {self.max_workers} max")
+        logger.info(f"Worker pool: max {self.max_workers} workers")
 
         start_time = time.time()
 
@@ -188,9 +187,7 @@ class MapillaryDownloader:
         # Step 2: Start worker pool
         # Since workers do both I/O (download) and CPU (WebP), need many more workers
         # Start with CPU count and scale up based on throughput
-        pool = AdaptiveWorkerPool(
-            worker_process, min_workers=self.initial_workers, max_workers=self.max_workers, monitoring_interval=10
-        )
+        pool = AdaptiveWorkerPool(worker_process, max_workers=self.max_workers, monitoring_interval=10)
         pool.start()
 
         # Step 3: Download images from metadata file while fetching new from API

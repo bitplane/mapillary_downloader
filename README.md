@@ -36,7 +36,7 @@ mapillary-downloader --output ./downloads USERNAME1
 | `--quality`     | 256, 1024, 2048 or original                  | `original`         |
 | `--bbox`        | `west,south,east,north`                      | `None`             |
 | `--no-webp`     | Don't convert to WebP                        | `False`            |
-| `--max-workers` | Maximum number of parallel download workers  | `128`              |
+| `--max-workers` | Maximum number of parallel download workers  | CPU count          |
 | `--no-tar`      | Don't tar bucket directories                 | `False`            |
 | `--no-check-ia` | Don't check if exists on Internet Archive    | `False`            |
 

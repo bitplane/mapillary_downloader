@@ -43,8 +43,8 @@ def main():
     parser.add_argument(
         "--max-workers",
         type=int,
-        default=128,
-        help="Maximum number of parallel workers (default: 128)",
+        default=os.cpu_count() or 8,
+        help=f"Maximum number of parallel workers (default: CPU count = {os.cpu_count() or 8})",
     )
     parser.add_argument(
         "--no-tar",

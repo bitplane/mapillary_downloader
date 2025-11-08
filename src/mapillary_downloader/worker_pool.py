@@ -17,17 +17,15 @@ class AdaptiveWorkerPool:
     - If throughput plateauing/decreasing: reduce workers
     """
 
-    def __init__(self, worker_func, min_workers=4, max_workers=16, monitoring_interval=10):
+    def __init__(self, worker_func, max_workers=16, monitoring_interval=10):
         """Initialize adaptive worker pool.
 
         Args:
             worker_func: Function to run in each worker (must accept work_queue, result_queue)
-            min_workers: Minimum number of workers
             max_workers: Maximum number of workers
             monitoring_interval: Seconds between throughput checks
         """
         self.worker_func = worker_func
-        self.min_workers = min_workers
         self.max_workers = max_workers
         self.monitoring_interval = monitoring_interval
 
@@ -37,7 +35,8 @@ class AdaptiveWorkerPool:
 
         # Worker management
         self.workers = []
-        self.current_workers = min_workers  # Start small and ramp up
+        # Start at 25% of max_workers (at least 1)
+        self.current_workers = max(1, int(max_workers * 0.25))
 
         # Throughput monitoring
         self.throughput_history = deque(maxlen=5)  # Last 5 measurements
