@@ -182,7 +182,7 @@ def generate_ia_metadata(collection_dir):
     write_meta_tag(meta_dir, "coverage", f"{first_date} - {last_date}")
     write_meta_tag(meta_dir, "licenseurl", "https://creativecommons.org/licenses/by-sa/4.0/")
     write_meta_tag(meta_dir, "mediatype", "data")
-    write_meta_tag(meta_dir, "collection", "opensource_media")
+    write_meta_tag(meta_dir, "collection", "mapillary-images")
 
     # Source and scanner metadata
     write_meta_tag(meta_dir, "source", f"https://www.mapillary.com/app/user/{username}")
