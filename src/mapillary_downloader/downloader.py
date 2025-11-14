@@ -99,7 +99,7 @@ class MapillaryDownloader:
         # Set up file logging for archival with timestamp for incremental runs
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         log_file = self.output_dir / f"download.log.{timestamp}"
-        add_file_handler(log_file)
+        self.file_handler = add_file_handler(log_file)
         logger.info(f"Logging to: {log_file}")
 
         self.metadata_file = self.output_dir / "metadata.jsonl"
@@ -459,6 +459,11 @@ class MapillaryDownloader:
 
         # Generate IA metadata
         generate_ia_metadata(self.output_dir)
+
+        # Close log file handler before moving directory
+        logger.info("Closing log file handler...")
+        self.file_handler.close()
+        logger.removeHandler(self.file_handler)
 
         # Move from staging to final destination
         logger.info("Moving collection from staging to final destination...")
