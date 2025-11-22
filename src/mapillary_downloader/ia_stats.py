@@ -31,7 +31,7 @@ def search_ia_collections():
     data = response.json()
 
     collections = data["response"]["docs"]
-    logger.info(f"Found {len(collections)} collections on archive.org")
+    logger.info(f"Found {len(collections):,} collections on archive.org")
 
     return collections
 
@@ -116,7 +116,7 @@ def update_cache(ia_collections):
 
     # Save updated cache
     safe_json_save(CACHE_FILE, cache)
-    logger.info(f"Updated cache with {len(cache)} collections")
+    logger.info(f"Updated cache with {len(cache):,} collections")
 
     return cache
 

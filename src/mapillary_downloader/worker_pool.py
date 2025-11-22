@@ -99,10 +99,7 @@ class AdaptiveWorkerPool:
         self.last_processed = total_processed
         self.last_check_time = now
 
-        logger.info(
-            f"Throughput: {throughput:.1f} items/s (workers: {current_workers}/{self.max_workers}, "
-            f"history: {len(self.throughput_history)} measurements)"
-        )
+        logger.info(f"Throughput: {throughput:.1f} items/s (workers: {current_workers}/{self.max_workers})")
 
         # Need at least 2 measurements to calculate gain per worker
         if len(self.throughput_history) < 2:
@@ -181,8 +178,6 @@ class AdaptiveWorkerPool:
                         self.current_workers += 1
                         added += 1
                 logger.info(f"Ramping up: added {added} workers (now {self.current_workers}/{self.max_workers})")
-        else:
-            logger.info(f"At optimal worker count: {current_workers} workers, {current_throughput:.1f} items/s")
 
     def shutdown(self, timeout=2):
         """Shutdown the worker pool gracefully."""

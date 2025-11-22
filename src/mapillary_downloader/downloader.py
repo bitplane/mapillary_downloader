@@ -220,11 +220,11 @@ class MapillaryDownloader:
                                 meta_f.flush()
 
                                 if new_images_count[0] % 1000 == 0:
-                                    logger.info(f"API: Fetched {new_images_count[0]} images from API")
+                                    logger.info(f"API: fetched {new_images_count[0]:,} image URLs")
 
                             # Mark as complete
                             MetadataReader.mark_complete(self.metadata_file)
-                            logger.info(f"API fetch complete: {new_images_count[0]} images")
+                            logger.info(f"API fetch complete: {new_images_count[0]:,} images")
                     finally:
                         api_fetch_complete.set()
 
@@ -317,7 +317,7 @@ class MapillaryDownloader:
                                 submitted += 1
 
                                 if submitted % 1000 == 0:
-                                    logger.info(f"Queue: Submitted {submitted} images")
+                                    logger.info(f"Queue: submitted {submitted:,} images")
 
                                 # Process results while submitting
                                 process_results()
@@ -368,7 +368,7 @@ class MapillaryDownloader:
                             submitted += 1
 
                             if submitted % 1000 == 0:
-                                logger.info(f"Queue: Submitted {submitted} images")
+                                logger.info(f"Queue: submitted {submitted:,} images")
 
                             # Process results while submitting
                             process_results()
@@ -386,7 +386,7 @@ class MapillaryDownloader:
                 process_results()
 
             # Send shutdown signals
-            logger.info(f"Submitted {submitted} images, waiting for workers to finish...")
+            logger.info(f"Submitted {submitted:,} images, waiting for workers to finish...")
             for _ in range(pool.current_workers):
                 pool.submit(None)
 
@@ -431,7 +431,7 @@ class MapillaryDownloader:
         self._save_progress()
         elapsed = time.time() - start_time
 
-        logger.info(f"Complete! Downloaded {downloaded_count} ({format_size(total_bytes)}), " f"failed {failed_count}")
+        logger.info(f"Complete! Downloaded {downloaded_count:,} ({format_size(total_bytes)}), failed {failed_count:,}")
         logger.info(f"Total time: {format_time(elapsed)}")
 
         # Tar sequence directories for efficient IA uploads
