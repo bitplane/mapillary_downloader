@@ -169,24 +169,15 @@ class MapillaryDownloader:
 
         quality_field = f"thumb_{self.quality}_url"
 
-        logger.info(f"Downloading images for user: {self.username}")
-        logger.info(f"Output directory: {self.output_dir}")
-        logger.info(f"Quality: {self.quality}")
-        logger.info(f"Worker pool: max {self.max_workers} workers")
+        logger.info(f"Downloading {self.username} @ {self.quality} (max {self.max_workers} workers)")
 
         start_time = time.time()
 
         # Step 1: Check if API fetch is already complete
         reader = MetadataReader(self.metadata_file)
         api_complete = reader.is_complete
-        if api_complete:
-            logger.info("API fetch already complete, will only download")
-        else:
-            logger.info("API fetch incomplete, will fetch and download in parallel")
 
         # Step 2: Start worker pool
-        # Since workers do both I/O (download) and CPU (WebP), need many more workers
-        # Start with CPU count and scale up based on throughput
         pool = AdaptiveWorkerPool(worker_process, max_workers=self.max_workers, monitoring_interval=10)
         pool.start()
 
@@ -197,7 +188,9 @@ class MapillaryDownloader:
         submitted = 0
         batch_start = time.time()
 
-        logger.info("Starting parallel download and API fetch...")
+        # Log how many we're skipping from previous run
+        if self.downloaded:
+            logger.info(f"Resuming: {len(self.downloaded):,} already downloaded")
 
         try:
             # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
@@ -210,7 +203,7 @@ class MapillaryDownloader:
                 def fetch_api_metadata():
                     """Fetch metadata from API and write to file (runs in thread)."""
                     try:
-                        logger.info("API fetch thread: Starting...")
+                        logger.debug("API fetch thread starting")
                         with open(self.metadata_file, "a") as meta_f:
                             for image in self.client.get_user_images(self.username, bbox=bbox):
                                 new_images_count[0] += 1
@@ -232,11 +225,10 @@ class MapillaryDownloader:
                 api_thread = threading.Thread(target=fetch_api_metadata, daemon=True)
                 api_thread.start()
             else:
-                logger.info("API fetch already complete, skipping API thread")
                 api_fetch_complete = None
 
             # Step 3b: Tail metadata file and submit to workers
-            logger.info("Starting metadata tail and download queue feeder...")
+            logger.debug("Starting metadata tail and download queue feeder")
             last_position = 0
 
             # Helper to process results from queue
@@ -386,7 +378,7 @@ class MapillaryDownloader:
                 process_results()
 
             # Send shutdown signals
-            logger.info(f"Submitted {submitted:,} images, waiting for workers to finish...")
+            logger.debug(f"Submitted {submitted:,} images, waiting for workers")
             for _ in range(pool.current_workers):
                 pool.submit(None)
 
@@ -461,16 +453,15 @@ class MapillaryDownloader:
         generate_ia_metadata(self.output_dir)
 
         # Close log file handler before moving directory
-        logger.info("Closing log file handler...")
         self.file_handler.close()
         logger.removeHandler(self.file_handler)
 
         # Move from staging to final destination
-        logger.info("Moving collection from staging to final destination...")
+        logger.info("Moving to final destination...")
         if self.final_dir.exists():
             logger.warning(f"Destination already exists, removing: {self.final_dir}")
             shutil.rmtree(self.final_dir)
 
         self.final_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(self.staging_dir), str(self.final_dir))
-        logger.info(f"Collection moved to: {self.final_dir}")
+        logger.info(f"Done: {self.final_dir}")

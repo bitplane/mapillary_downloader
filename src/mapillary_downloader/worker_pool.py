@@ -49,7 +49,7 @@ class AdaptiveWorkerPool:
     def start(self):
         """Start the worker pool."""
         self.running = True
-        logger.info(f"Starting worker pool with {self.current_workers} workers")
+        logger.debug(f"Starting worker pool with {self.current_workers} workers")
 
         for i in range(self.current_workers):
             self._add_worker(i)
@@ -181,7 +181,7 @@ class AdaptiveWorkerPool:
 
     def shutdown(self, timeout=2):
         """Shutdown the worker pool gracefully."""
-        logger.info("Shutting down worker pool...")
+        logger.debug("Shutting down worker pool")
         self.running = False
 
         # Terminate all workers immediately (they ignore SIGINT so we need to be forceful)
@@ -192,5 +192,3 @@ class AdaptiveWorkerPool:
         # Give them a brief moment to exit
         for p in self.workers:
             p.join(timeout=timeout)
-
-        logger.info("Worker pool shutdown complete")
