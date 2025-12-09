@@ -15,14 +15,14 @@ def search_ia_collections():
     """Search IA for all mapillary_downloader collections.
 
     Returns:
-        List of dicts with: identifier, description, item_size, uploader
+        List of dicts with: identifier, description, item_size, collection
     """
     logger.info("Searching archive.org for mapillary_downloader collections...")
 
     url = "https://archive.org/advancedsearch.php"
     params = {
         "q": "mapillary_downloader:*",
-        "fl[]": ["identifier", "description", "item_size", "uploader"],
+        "fl[]": ["identifier", "description", "item_size", "collection"],
         "rows": 10000,
         "output": "json",
     }
@@ -34,6 +34,24 @@ def search_ia_collections():
     logger.info(f"Found {len(collections):,} collections on archive.org")
 
     return collections
+
+
+def fetch_uploader(identifier):
+    """Fetch uploader email from item metadata.
+
+    Args:
+        identifier: IA item identifier
+
+    Returns:
+        Uploader email or None
+    """
+    url = f"https://archive.org/metadata/{identifier}/metadata/uploader"
+    try:
+        response = http_get_with_retry(url, max_retries=2)
+        data = response.json()
+        return data.get("result")
+    except Exception:
+        return None
 
 
 def parse_collection_info(identifier):
@@ -104,14 +122,23 @@ def update_cache(ia_collections):
 
         image_count = extract_image_count(item.get("description"))
 
+        # Get IA collection(s) - can be a string or list
+        ia_collection = item.get("collection", [])
+        if isinstance(ia_collection, str):
+            ia_collection = [ia_collection]
+
+        # Preserve existing uploader if we have it cached
+        existing = cache.get(identifier, {})
+
         # Update cache entry
         cache[identifier] = {
             "size": size_bytes,
-            "uploader": item.get("uploader"),
+            "uploader": existing.get("uploader"),  # Preserve cached uploader
             "images": image_count,
             "quality": info["quality"],
             "username": info["username"],
             "is_webp": info["is_webp"],
+            "ia_collection": ia_collection,
         }
 
     # Save updated cache
@@ -168,11 +195,12 @@ def aggregate_stats(cache):
     return stats
 
 
-def format_stats(stats):
+def format_stats(stats, cache):
     """Format statistics as human-readable text.
 
     Args:
         stats: Dict from aggregate_stats()
+        cache: Dict of collection data
 
     Returns:
         Formatted string
@@ -212,6 +240,62 @@ def format_stats(stats):
         )
 
     output.append("")
+
+    # Find items not in mapillary-images and fetch uploaders
+    not_in_mapillary_images = []
+    need_uploader_fetch = []
+
+    for identifier, data in cache.items():
+        ia_collections = data.get("ia_collection", [])
+        if "mapillary-images" not in ia_collections:
+            not_in_mapillary_images.append(identifier)
+            if not data.get("uploader"):
+                need_uploader_fetch.append(identifier)
+
+    # Fetch missing uploaders
+    if need_uploader_fetch:
+        logger.info(f"Fetching uploader info for {len(need_uploader_fetch)} items...")
+        for i, identifier in enumerate(need_uploader_fetch, 1):
+            logger.info(f"  [{i}/{len(need_uploader_fetch)}] {identifier}")
+            uploader = fetch_uploader(identifier)
+            if uploader:
+                cache[identifier]["uploader"] = uploader
+        # Save updated cache with uploaders
+        safe_json_save(CACHE_FILE, cache)
+
+    # Group by uploader (only for items not in mapillary-images)
+    by_uploader = {}
+    for identifier in not_in_mapillary_images:
+        uploader = cache[identifier].get("uploader") or "unknown"
+        if uploader not in by_uploader:
+            by_uploader[uploader] = {"items": [], "images": 0, "size": 0}
+        by_uploader[uploader]["items"].append(identifier)
+        by_uploader[uploader]["images"] += cache[identifier].get("images") or 0
+        by_uploader[uploader]["size"] += cache[identifier].get("size") or 0
+
+    # By uploader (only those with items outside mapillary-images)
+    if by_uploader:
+        output.append("Uploaders with items outside mapillary-images:")
+        output.append("-" * 70)
+        for uploader, data in sorted(by_uploader.items(), key=lambda x: -len(x[1]["items"])):
+            output.append(
+                f"  {uploader}: {len(data['items'])} items, " f"{data['images']:,} images, {format_size(data['size'])}"
+            )
+        output.append("")
+
+    # Items not in mapillary-images, grouped by uploader
+    if not_in_mapillary_images:
+        output.append(f"Items NOT in mapillary-images ({len(not_in_mapillary_images)}):")
+        output.append("-" * 70)
+        for uploader, data in sorted(by_uploader.items(), key=lambda x: x[0].lower()):
+            output.append(f"{uploader}:")
+            for identifier in sorted(data["items"]):
+                output.append(identifier)
+            output.append("")
+    else:
+        output.append("All items are in mapillary-images collection!")
+        output.append("")
+
     output.append(f"Cache: {CACHE_FILE}")
 
     return "\n".join(output)
@@ -239,4 +323,4 @@ def show_stats(refresh=True):
         return
 
     stats = aggregate_stats(cache)
-    print(format_stats(stats))
+    print(format_stats(stats, cache))

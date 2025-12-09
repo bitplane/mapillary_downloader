@@ -186,11 +186,6 @@ class MapillaryDownloader:
         total_bytes = 0
         failed_count = 0
         submitted = 0
-        batch_start = time.time()
-
-        # Log how many we're skipping from previous run
-        if self.downloaded:
-            logger.info(f"Resuming: {len(self.downloaded):,} already downloaded")
 
         try:
             # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
@@ -250,12 +245,7 @@ class MapillaryDownloader:
                         # Log every download for first 10, then every 100
                         should_log = downloaded_count <= 10 or downloaded_count % 100 == 0
                         if should_log:
-                            elapsed = time.time() - batch_start
-                            rate = downloaded_count / elapsed if elapsed > 0 else 0
-                            logger.info(
-                                f"Downloaded: {downloaded_count} ({format_size(total_bytes)}) "
-                                f"- Rate: {rate:.1f} images/sec"
-                            )
+                            logger.info(f"Downloaded: {downloaded_count:,} ({format_size(total_bytes)})")
 
                         if downloaded_count % 100 == 0:
                             self._save_progress()
@@ -293,6 +283,7 @@ class MapillaryDownloader:
 
                                 # Skip if already downloaded or no quality URL
                                 if image_id in self.downloaded:
+                                    downloaded_count += 1
                                     continue
                                 if not image.get(quality_field):
                                     continue
@@ -344,6 +335,7 @@ class MapillaryDownloader:
 
                             # Skip if already downloaded or no quality URL
                             if image_id in self.downloaded:
+                                downloaded_count += 1
                                 continue
                             if not image.get(quality_field):
                                 continue
@@ -400,16 +392,8 @@ class MapillaryDownloader:
                     downloaded_count += 1
                     total_bytes += bytes_dl
 
-                    if downloaded_count % 10 == 0:
-                        elapsed = time.time() - batch_start
-                        rate = downloaded_count / elapsed if elapsed > 0 else 0
-                        remaining = submitted - completed
-                        eta_seconds = remaining / rate if rate > 0 else 0
-
-                        logger.info(
-                            f"Downloaded: {downloaded_count}/{submitted} ({format_size(total_bytes)}) "
-                            f"- ETA: {format_time(eta_seconds)}"
-                        )
+                    if downloaded_count % 100 == 0:
+                        logger.info(f"Downloaded: {downloaded_count:,} ({format_size(total_bytes)})")
                         self._save_progress()
                         pool.check_throughput(downloaded_count)
                 else:
