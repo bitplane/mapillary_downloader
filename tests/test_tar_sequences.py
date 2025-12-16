@@ -240,3 +240,72 @@ def test_tar_multiple_dates(tmp_path):
     assert not (collection / "2024-01-15").exists()
     assert not (collection / "2024-02-10").exists()
     assert not (collection / "2024-03-20").exists()
+
+
+def test_tar_addendum_no_overwrite(tmp_path):
+    """Test that existing tars are not overwritten - addendums are created instead."""
+    collection = tmp_path / "mapillary-test-original"
+    collection.mkdir()
+
+    # Create a pre-existing tar (simulating previous run)
+    existing_tar = collection / "2024-01-15.tar"
+    existing_tar.write_bytes(b"original tar content")
+
+    # Create date directory with new files (simulating retry with skipped files)
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_new"
+    seq_dir.mkdir()
+    (seq_dir / "new_image.webp").write_bytes(b"new image data")
+
+    tarred_count, total_files = tar_sequence_directories(collection)
+
+    assert tarred_count == 1
+    assert total_files == 1
+
+    # Original tar should be untouched
+    assert existing_tar.exists()
+    assert existing_tar.read_bytes() == b"original tar content"
+
+    # Addendum should exist
+    addendum_tar = collection / "2024-01-15.1.tar"
+    assert addendum_tar.exists()
+
+    # Verify addendum contents
+    with tarfile.open(addendum_tar) as tar:
+        members = tar.getmembers()
+        assert len(members) == 1
+        assert members[0].name == "2024-01-15/seq_new/new_image.webp"
+
+    # Date directory should be gone
+    assert not date_dir.exists()
+
+
+def test_tar_multiple_addendums(tmp_path):
+    """Test that multiple addendums are numbered sequentially."""
+    collection = tmp_path / "mapillary-test-original"
+    collection.mkdir()
+
+    # Create pre-existing tars
+    (collection / "2024-01-15.tar").write_bytes(b"original")
+    (collection / "2024-01-15.1.tar").write_bytes(b"first addendum")
+    (collection / "2024-01-15.2.tar").write_bytes(b"second addendum")
+
+    # Create date directory with new files
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_third"
+    seq_dir.mkdir()
+    (seq_dir / "image.webp").write_bytes(b"third batch")
+
+    tarred_count, total_files = tar_sequence_directories(collection)
+
+    assert tarred_count == 1
+
+    # All previous tars untouched
+    assert (collection / "2024-01-15.tar").read_bytes() == b"original"
+    assert (collection / "2024-01-15.1.tar").read_bytes() == b"first addendum"
+    assert (collection / "2024-01-15.2.tar").read_bytes() == b"second addendum"
+
+    # Third addendum created
+    assert (collection / "2024-01-15.3.tar").exists()

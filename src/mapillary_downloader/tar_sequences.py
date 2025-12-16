@@ -52,7 +52,18 @@ def tar_sequence_directories(collection_dir):
 
     for date_dir in date_dirs:
         date_name = date_dir.name
+
+        # Find next available tar filename (don't overwrite existing tars)
         tar_path = collection_dir / f"{date_name}.tar"
+        if tar_path.exists():
+            # Find next available addendum number
+            addendum = 1
+            while True:
+                tar_path = collection_dir / f"{date_name}.{addendum}.tar"
+                if not tar_path.exists():
+                    break
+                addendum += 1
+            logger.info(f"Existing tar for {date_name}, creating addendum: {tar_path.name}")
 
         # Count files in date directory
         files_to_tar = sorted([f for f in date_dir.rglob("*") if f.is_file()], key=lambda x: str(x))
