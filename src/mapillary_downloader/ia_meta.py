@@ -42,7 +42,10 @@ def get_date_range(metadata_file):
     with gzip.open(metadata_file, "rt") as f:
         for line in f:
             if line.strip():
-                data = json.loads(line)
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
                 if "captured_at" in data:
                     timestamps.append(data["captured_at"])
 
