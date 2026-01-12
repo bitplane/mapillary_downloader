@@ -105,6 +105,7 @@ class MapillaryDownloader:
         self.metadata_file = self.output_dir / "metadata.jsonl"
         self.progress_file = self.output_dir / "progress.json"
         self.downloaded = self._load_progress()
+        self._last_save_time = time.time()
 
     def _load_progress(self):
         """Load previously downloaded image IDs for this quality."""
@@ -248,8 +249,11 @@ class MapillaryDownloader:
                             logger.info(f"Downloaded: {downloaded_count:,} ({format_size(total_bytes)})")
 
                         if downloaded_count % 100 == 0:
-                            self._save_progress()
                             pool.check_throughput(downloaded_count)
+                            # Save progress every 5 minutes
+                            if time.time() - self._last_save_time >= 300:
+                                self._save_progress()
+                                self._last_save_time = time.time()
                     else:
                         failed_count += 1
                         logger.warning(f"Failed to download {image_id}: {error_msg}")
@@ -394,8 +398,11 @@ class MapillaryDownloader:
 
                     if downloaded_count % 100 == 0:
                         logger.info(f"Downloaded: {downloaded_count:,} ({format_size(total_bytes)})")
-                        self._save_progress()
                         pool.check_throughput(downloaded_count)
+                        # Save progress every 5 minutes
+                        if time.time() - self._last_save_time >= 300:
+                            self._save_progress()
+                            self._last_save_time = time.time()
                 else:
                     failed_count += 1
                     logger.warning(f"Failed to download {image_id}: {error_msg}")
