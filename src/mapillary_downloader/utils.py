@@ -77,7 +77,7 @@ def safe_json_save(file_path, data):
     temp_file.replace(file_path)
 
 
-def http_get_with_retry(url, params=None, max_retries=5, base_delay=1.0, timeout=60):
+def http_get_with_retry(url, params=None, max_retries=5, base_delay=1.0, timeout=60, session=None):
     """HTTP GET with exponential backoff retry.
 
     Args:
@@ -86,6 +86,7 @@ def http_get_with_retry(url, params=None, max_retries=5, base_delay=1.0, timeout
         max_retries: Maximum retry attempts (default: 5)
         base_delay: Initial delay in seconds (default: 1.0)
         timeout: Request timeout in seconds (default: 60)
+        session: Optional requests.Session for connection pooling
 
     Returns:
         requests.Response object
@@ -93,9 +94,10 @@ def http_get_with_retry(url, params=None, max_retries=5, base_delay=1.0, timeout
     Raises:
         requests.RequestException: If all retries exhausted
     """
+    getter = session or requests
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, params=params, timeout=timeout)
+            response = getter.get(url, params=params, timeout=timeout)
             response.raise_for_status()
             return response
         except RequestException as e:

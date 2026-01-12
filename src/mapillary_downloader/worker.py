@@ -105,7 +105,7 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
 
         try:
             # Use retry logic with 3 attempts for image downloads
-            response = http_get_with_retry(image_url, max_retries=3, base_delay=1.0, timeout=60)
+            response = http_get_with_retry(image_url, max_retries=3, base_delay=1.0, timeout=60, session=session)
 
             with open(jpg_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
