@@ -132,7 +132,7 @@ def test_write_exif_to_image_compass(tmp_path):
 
 
 def test_write_exif_uses_computed_values(tmp_path):
-    """Test that computed values are preferred over originals."""
+    """Test computed value preferences (geometry/compass: computed, altitude: raw)."""
     img = Image.new("RGB", (100, 100), color="yellow")
     image_path = tmp_path / "test.jpg"
     img.save(image_path)
@@ -157,9 +157,9 @@ def test_write_exif_uses_computed_values(tmp_path):
     lat_dms = exif_dict["GPS"][piexif.GPSIFD.GPSLatitude]
     assert lat_dms[0][0] == 2  # 2 degrees
 
-    # Should use computed_altitude (200) not altitude (100)
+    # Should use raw altitude (100) not computed_altitude (200) - photogrammetry can't compute elevation
     altitude = exif_dict["GPS"][piexif.GPSIFD.GPSAltitude]
-    assert altitude[0] == 20000  # 200 * 100
+    assert altitude[0] == 10000  # 100 * 100
 
     # Should use computed_compass_angle (180) not compass_angle (90)
     direction = exif_dict["GPS"][piexif.GPSIFD.GPSImgDirection]
