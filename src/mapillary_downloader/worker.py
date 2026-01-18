@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 import requests
 from mapillary_downloader.exif_writer import write_exif_to_image
+from mapillary_downloader.xmp_writer import write_xmp_to_image
 from mapillary_downloader.webp_converter import convert_to_webp
 from mapillary_downloader.utils import http_get_with_retry
 
@@ -116,6 +117,9 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
 
         # Write EXIF metadata
         write_exif_to_image(jpg_path, image_data)
+
+        # Write XMP metadata for panoramas
+        write_xmp_to_image(jpg_path, image_data)
 
         # Convert to WebP if requested
         if convert_webp:
