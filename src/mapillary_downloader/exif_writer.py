@@ -85,8 +85,8 @@ def write_exif_to_image(image_path, metadata):
             exif_dict["0th"][piexif.ImageIFD.DateTime] = datetime_bytes
             exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = datetime_bytes
             exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = datetime_bytes
-            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeOriginal] = ('000'+str(metadata["captured_at"] % 1000))[-3:]
-            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeDigitized] = ('000'+str(metadata["captured_at"] % 1000))[-3:]
+            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeOriginal] = ("000" + str(metadata["captured_at"] % 1000))[-3:]
+            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeDigitized] = ("000" + str(metadata["captured_at"] % 1000))[-3:]
 
         # GPS data - prefer computed_geometry over geometry
         geometry = metadata.get("computed_geometry") or metadata.get("geometry")
@@ -101,8 +101,8 @@ def write_exif_to_image(image_path, metadata):
             exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = decimal_to_dms(lon)
             exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = b"E" if lon >= 0 else b"W"
 
-        # GPS Altitude - prefer computed_altitude over altitude
-        altitude = metadata.get("computed_altitude") or metadata.get("altitude")
+        # GPS Altitude - prefer raw altitude (photogrammetry can't compute elevation)
+        altitude = metadata.get("altitude") or metadata.get("computed_altitude")
         if altitude is not None:
             altitude_val = int(abs(altitude) * 100)
             logger.debug(f"Raw altitude value: {altitude}, calculated: {altitude_val}")
