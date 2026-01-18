@@ -72,9 +72,6 @@ def write_exif_to_image(image_path, metadata):
         if "model" in metadata and metadata["model"]:
             exif_dict["0th"][piexif.ImageIFD.Model] = metadata["model"].encode("utf-8")
 
-        if "exif_orientation" in metadata and metadata["exif_orientation"]:
-            exif_dict["0th"][piexif.ImageIFD.Orientation] = metadata["exif_orientation"]
-
         if "width" in metadata and metadata["width"]:
             exif_dict["0th"][piexif.ImageIFD.ImageWidth] = metadata["width"]
 
