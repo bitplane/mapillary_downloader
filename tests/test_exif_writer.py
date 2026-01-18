@@ -84,7 +84,6 @@ def test_write_exif_to_image_camera(tmp_path):
         "model": "EOS 5D",
         "width": 4032,
         "height": 3024,
-        "exif_orientation": 1,
         "captured_at": 1705320645000,
     }
 
@@ -99,7 +98,7 @@ def test_write_exif_to_image_camera(tmp_path):
     assert exif_dict["0th"][piexif.ImageIFD.Model] == b"EOS 5D"
     assert exif_dict["0th"][piexif.ImageIFD.ImageWidth] == 4032
     assert exif_dict["0th"][piexif.ImageIFD.ImageLength] == 3024
-    assert exif_dict["0th"][piexif.ImageIFD.Orientation] == 1
+    # Note: orientation intentionally not written - Mapillary thumbs are pre-rotated
 
     # Check datetime
     assert piexif.ImageIFD.DateTime in exif_dict["0th"]
