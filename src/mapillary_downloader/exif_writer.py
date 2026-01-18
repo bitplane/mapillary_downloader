@@ -72,9 +72,6 @@ def write_exif_to_image(image_path, metadata):
         if "model" in metadata and metadata["model"]:
             exif_dict["0th"][piexif.ImageIFD.Model] = metadata["model"].encode("utf-8")
 
-        if "exif_orientation" in metadata and metadata["exif_orientation"]:
-            exif_dict["0th"][piexif.ImageIFD.Orientation] = metadata["exif_orientation"]
-
         if "width" in metadata and metadata["width"]:
             exif_dict["0th"][piexif.ImageIFD.ImageWidth] = metadata["width"]
 
@@ -88,6 +85,8 @@ def write_exif_to_image(image_path, metadata):
             exif_dict["0th"][piexif.ImageIFD.DateTime] = datetime_bytes
             exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = datetime_bytes
             exif_dict["Exif"][piexif.ExifIFD.DateTimeDigitized] = datetime_bytes
+            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeOriginal] = ('000'+str(metadata["captured_at"] % 1000))[-3:]
+            exif_dict["Exif"][piexif.ExifIFD.SubSecTimeDigitized] = ('000'+str(metadata["captured_at"] % 1000))[-3:]
 
         # GPS data - prefer computed_geometry over geometry
         geometry = metadata.get("computed_geometry") or metadata.get("geometry")
