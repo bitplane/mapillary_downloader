@@ -2,7 +2,7 @@
 
 Download your Mapillary data before it's gone.
 
-## Installation
+## ▶️ Installation
 
 Installation is optional, you can prefix the command with `uvx` or `pipx` to
 download and run it. Or if you're oldskool you can do:
@@ -11,7 +11,7 @@ download and run it. Or if you're oldskool you can do:
 pip install mapillary-downloader
 ```
 
-## Usage
+## ❓ Usage
 
 First, get your Mapillary API access token from
 [the developer dashboard](https://www.mapillary.com/dashboard/developers)
@@ -45,12 +45,14 @@ The downloader will:
 * 🏛️ Check Internet Archive to avoid duplicate downloads
 * 📷 Download multiple users' images organized by sequence
 * 📜 Inject EXIF metadata (GPS coordinates, camera info, timestamps,
-  compass direction)
+     compass direction) and XMP data for panoramas.
 * 🗜️ Convert to WebP (by default) to save ~70% disk space
-* 🛟 Save progress so you can safely resume if interrupted
-* 📦 Tar sequence directories (by default) for faster uploads to Internet Archive
+* 🛟 Save progress every 5 minutes so you can safely resume if interrupted
+     ()
+* 📦 Tar sequence directories (by default) for faster uploads to Internet
+     Archive
 
-## WebP Conversion
+## 🖼️ WebP Conversion
 
 You'll need the `cwebp` binary installed:
 
@@ -64,11 +66,7 @@ brew install webp
 
 To disable WebP conversion and keep original JPEGs, use `--no-webp`:
 
-```bash
-mapillary-downloader --no-webp USERNAME
-```
-
-## Tarballs
+## 📦 Tarballs
 
 Images are organized by capture date (YYYY-MM-DD) for incremental archiving:
 
@@ -86,16 +84,20 @@ mapillary-username-quality/
 ```
 
 By default, these date directories are automatically tarred after download
-(resulting in `2024-01-15.tar`, `2024-01-16.tar`, etc.). This date-based
-organization enables:
+(`2024-01-15.tar`, `2024-01-16.tar`, etc.). Reasons:
 
-- **Incremental uploads** - Upload each day's tar as soon as it's ready
-- **Manageable file counts** - ~365 days/year × 10 years = 3,650 tars max
-- **Chronological organization** - Natural sorting and progress tracking
+* ⤴️ Incremental uploads. Add more to a collection. Well, eventually anyway.
+     This won't work yet unless you delete the jsonl file and start again.
+* 📂 Fewer files - ~365 days/year × 10 years = 3,650 tars max. IA only want
+     5k items per collection
+* 🧨 Avoids blowing up IA's derive workers. We don't want Brewster's computers
+     to create thumbs for 2 billion images.
+* 💾 I like to have a few inodes available for things other than this. I'm sure
+     you do too.
 
 To keep individual files instead of creating tars, use the `--no-tar` flag.
 
-## Internet Archive upload
+## 🏛️ Internet Archive upload
 
 I've written a bash tool to rip media then tag, queue, and upload to The
 Internet Archive. The metadata is in the same format. If you symlink your
@@ -109,15 +111,11 @@ See inlay for details:
 
 To see overall project progress, or an estimate, use `--stats`
 
-```bash
-mapillary-downloader --stats
-```
-
 ## 🚧 Development
 
 ```bash
 make dev      # Setup dev environment
-make test     # Run tests
+make test     # Run tests. Note: requires `exiftool`
 make dist     # Build the distribution
 make help     # See other make options
 ```
@@ -130,11 +128,11 @@ make help     # See other make options
 * [🐱 github](https://github.com/bitplane/mapillary_downloader)
 * [📀 rip](https://bitplane.net/dev/sh/rip)
 
-## License
+## ⚖️ License
 
 WTFPL with one additional clause
 
 1. Don't blame me
 
 Do wtf you want, but don't blame me if it makes jokes about the size of your
-disk drive.
+disk.
