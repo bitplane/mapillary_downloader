@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import shutil
+import threading
 import time
 from pathlib import Path
 from mapillary_downloader.utils import format_size, format_time, safe_json_save
@@ -146,6 +147,65 @@ class MapillaryDownloader:
         # Write atomically using utility function
         safe_json_save(self.progress_file, progress)
 
+    def _submit_metadata_batch(self, file_handle, quality_field, pool, convert_webp, process_results, base_submitted):
+        """Read metadata lines from current position, submit to workers.
+
+        Args:
+            file_handle: Open file positioned at read point
+            quality_field: Field name for quality URL (e.g., "thumb_1024_url")
+            pool: Worker pool to submit to
+            convert_webp: Whether to convert to webp
+            process_results: Callback to drain result queue
+            base_submitted: Running total for cumulative logging
+
+        Returns:
+            tuple: (submitted_count, skipped_count) for this batch
+        """
+        submitted = 0
+        skipped = 0
+
+        for line in file_handle:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                image = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            if image.get("__complete__"):
+                continue
+
+            image_id = image.get("id")
+            if not image_id:
+                continue
+
+            if image_id in self.downloaded:
+                skipped += 1
+                continue
+
+            if not image.get(quality_field):
+                continue
+
+            work_item = (
+                image,
+                str(self.output_dir),
+                self.quality,
+                convert_webp,
+                self.client.access_token,
+            )
+            pool.submit(work_item)
+            submitted += 1
+
+            total = base_submitted + submitted
+            if total % 1000 == 0:
+                logger.info(f"Queue: submitted {total:,} images")
+
+            process_results()
+
+        return submitted, skipped
+
     def download_user_data(self, bbox=None, convert_webp=False):
         """Download all images for a user using streaming queue-based architecture.
 
@@ -191,10 +251,9 @@ class MapillaryDownloader:
 
         try:
             # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
-            if not api_complete:
-                import threading
+            api_fetch_complete = threading.Event()
 
-                api_fetch_complete = threading.Event()
+            if not api_complete:
                 new_images_count = [0]  # Mutable so thread can update it
 
                 def fetch_api_metadata():
@@ -222,7 +281,7 @@ class MapillaryDownloader:
                 api_thread = threading.Thread(target=fetch_api_metadata, daemon=True)
                 api_thread.start()
             else:
-                api_fetch_complete = None
+                api_fetch_complete.set()
 
             # Step 3b: Tail metadata file and submit to workers
             logger.debug("Starting metadata tail and download queue feeder")
@@ -261,117 +320,20 @@ class MapillaryDownloader:
 
             # Tail the metadata file and submit to workers
             while True:
-                # Check if API fetch is done and we've processed everything
-                if api_fetch_complete and api_fetch_complete.is_set():
-                    # Read any remaining lines
-                    if self.metadata_file.exists():
-                        with open(self.metadata_file) as f:
-                            f.seek(last_position)
-                            for line in f:
-                                line = line.strip()
-                                if not line:
-                                    continue
-
-                                try:
-                                    image = json.loads(line)
-                                except json.JSONDecodeError:
-                                    # Incomplete line, will retry
-                                    continue
-
-                                # Skip completion marker
-                                if image.get("__complete__"):
-                                    continue
-
-                                image_id = image.get("id")
-                                if not image_id:
-                                    continue
-
-                                # Skip if already downloaded or no quality URL
-                                if image_id in self.downloaded:
-                                    skipped_count += 1
-                                    continue
-                                if not image.get(quality_field):
-                                    continue
-
-                                # Submit to workers
-                                work_item = (
-                                    image,
-                                    str(self.output_dir),
-                                    self.quality,
-                                    convert_webp,
-                                    self.client.access_token,
-                                )
-                                pool.submit(work_item)
-                                submitted += 1
-
-                                if submitted % 1000 == 0:
-                                    logger.info(f"Queue: submitted {submitted:,} images")
-
-                                # Process results while submitting
-                                process_results()
-
-                            last_position = f.tell()
-
-                    # API done and all lines processed, break
-                    break
-
-                # API still running or API was already complete, tail the file
                 if self.metadata_file.exists():
                     with open(self.metadata_file) as f:
                         f.seek(last_position)
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-
-                            try:
-                                image = json.loads(line)
-                            except json.JSONDecodeError:
-                                # Incomplete line, will retry next iteration
-                                continue
-
-                            # Skip completion marker
-                            if image.get("__complete__"):
-                                continue
-
-                            image_id = image.get("id")
-                            if not image_id:
-                                continue
-
-                            # Skip if already downloaded or no quality URL
-                            if image_id in self.downloaded:
-                                skipped_count += 1
-                                continue
-                            if not image.get(quality_field):
-                                continue
-
-                            # Submit to workers
-                            work_item = (
-                                image,
-                                str(self.output_dir),
-                                self.quality,
-                                convert_webp,
-                                self.client.access_token,
-                            )
-                            pool.submit(work_item)
-                            submitted += 1
-
-                            if submitted % 1000 == 0:
-                                logger.info(f"Queue: submitted {submitted:,} images")
-
-                            # Process results while submitting
-                            process_results()
-
+                        batch_submitted, batch_skipped = self._submit_metadata_batch(
+                            f, quality_field, pool, convert_webp, process_results, submitted
+                        )
+                        submitted += batch_submitted
+                        skipped_count += batch_skipped
                         last_position = f.tell()
 
-                # If API is already complete, we've read the whole file, so break
-                if api_fetch_complete is None:
+                if api_fetch_complete.is_set():
                     break
 
-                # Sleep briefly before next tail iteration
                 time.sleep(0.1)
-
-                # Process any results that came in
                 process_results()
 
             # Send shutdown signals
