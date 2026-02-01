@@ -187,6 +187,7 @@ class MapillaryDownloader:
         total_bytes = 0
         failed_count = 0
         submitted = 0
+        skipped_count = 0
 
         try:
             # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
@@ -287,7 +288,7 @@ class MapillaryDownloader:
 
                                 # Skip if already downloaded or no quality URL
                                 if image_id in self.downloaded:
-                                    downloaded_count += 1
+                                    skipped_count += 1
                                     continue
                                 if not image.get(quality_field):
                                     continue
@@ -339,7 +340,7 @@ class MapillaryDownloader:
 
                             # Skip if already downloaded or no quality URL
                             if image_id in self.downloaded:
-                                downloaded_count += 1
+                                skipped_count += 1
                                 continue
                             if not image.get(quality_field):
                                 continue
@@ -414,7 +415,10 @@ class MapillaryDownloader:
         self._save_progress()
         elapsed = time.time() - start_time
 
-        logger.info(f"Complete! Downloaded {downloaded_count:,} ({format_size(total_bytes)}), failed {failed_count:,}")
+        logger.info(
+            f"Complete! Downloaded {downloaded_count:,} ({format_size(total_bytes)}), "
+            f"skipped {skipped_count:,} existing, failed {failed_count:,}"
+        )
         logger.info(f"Total time: {format_time(elapsed)}")
 
         # Tar sequence directories for efficient IA uploads
