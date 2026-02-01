@@ -1,6 +1,8 @@
 """Tests for metadata reader."""
 
+import gzip
 import json
+
 from mapillary_downloader.metadata_reader import MetadataReader
 
 
@@ -115,3 +117,93 @@ def test_metadata_reader_mark_complete(tmp_path):
     ids = reader.get_all_ids()
     assert reader.is_complete
     assert len(ids) == 1
+
+
+def test_metadata_reader_gzip(tmp_path):
+    """Test reading gzipped metadata file."""
+    metadata_file = tmp_path / "metadata.jsonl.gz"
+
+    # Write gzipped test data
+    with gzip.open(metadata_file, "wt") as f:
+        f.write(json.dumps({"id": "img1", "thumb_original_url": "http://example.com/1.jpg"}) + "\n")
+        f.write(json.dumps({"id": "img2", "thumb_original_url": "http://example.com/2.jpg"}) + "\n")
+        f.write(json.dumps({"__complete__": True}) + "\n")
+
+    reader = MetadataReader(metadata_file)
+
+    assert reader.is_complete
+    ids = reader.get_all_ids()
+    assert len(ids) == 2
+
+    images = list(reader.iter_images())
+    assert len(images) == 2
+
+
+def test_metadata_reader_empty_lines(tmp_path):
+    """Test handling of empty lines in metadata file."""
+    metadata_file = tmp_path / "metadata.jsonl"
+
+    # Write data with empty lines
+    with open(metadata_file, "w") as f:
+        f.write(json.dumps({"id": "img1"}) + "\n")
+        f.write("\n")  # empty line
+        f.write("   \n")  # whitespace-only line
+        f.write(json.dumps({"id": "img2"}) + "\n")
+
+    reader = MetadataReader(metadata_file)
+    ids = reader.get_all_ids()
+    assert len(ids) == 2
+
+
+def test_metadata_reader_missing_id(tmp_path):
+    """Test handling of entries without id."""
+    metadata_file = tmp_path / "metadata.jsonl"
+
+    # Write data including entry without id
+    with open(metadata_file, "w") as f:
+        f.write(json.dumps({"id": "img1"}) + "\n")
+        f.write(json.dumps({"no_id": "here"}) + "\n")
+        f.write(json.dumps({"id": "img2"}) + "\n")
+
+    reader = MetadataReader(metadata_file)
+    ids = reader.get_all_ids()
+    assert len(ids) == 2
+    assert "img1" in ids
+    assert "img2" in ids
+
+    images = list(reader.iter_images())
+    assert len(images) == 2
+
+
+def test_metadata_reader_completion_in_iter(tmp_path):
+    """Test completion marker detection during iter_images."""
+    metadata_file = tmp_path / "metadata.jsonl"
+
+    # Write data with completion marker
+    with open(metadata_file, "w") as f:
+        f.write(json.dumps({"id": "img1"}) + "\n")
+        f.write(json.dumps({"__complete__": True}) + "\n")
+
+    reader = MetadataReader(metadata_file)
+    # Don't call get_all_ids first - test detection via iter_images
+    reader.is_complete = False
+
+    images = list(reader.iter_images())
+    assert len(images) == 1
+    assert reader.is_complete
+
+
+def test_metadata_reader_many_lines(tmp_path):
+    """Test completion check with more than 10 lines."""
+    metadata_file = tmp_path / "metadata.jsonl"
+
+    # Write more than 10 lines
+    with open(metadata_file, "w") as f:
+        for i in range(15):
+            f.write(json.dumps({"id": f"img{i}"}) + "\n")
+        f.write(json.dumps({"__complete__": True}) + "\n")
+
+    reader = MetadataReader(metadata_file)
+    assert reader.is_complete
+    ids = reader.get_all_ids()
+    assert len(ids) == 15
