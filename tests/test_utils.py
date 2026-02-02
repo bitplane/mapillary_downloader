@@ -1,6 +1,8 @@
 """Tests for utility functions."""
 
-from mapillary_downloader.utils import format_size, format_time, safe_json_save
+import pytest
+from requests.exceptions import RequestException
+from mapillary_downloader.utils import format_size, format_time, safe_json_save, http_get_with_retry
 
 
 def test_format_size_bytes():
@@ -96,3 +98,96 @@ def test_safe_json_save_overwrites(tmp_path):
     with open(test_file) as f:
         loaded = json.load(f)
     assert loaded == {"new": "data"}
+
+
+class FakeResponse:
+    """Fake response object for testing."""
+
+    def __init__(self, status_code=200):
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RequestException(f"HTTP {self.status_code}")
+
+
+class FakeSession:
+    """Fake session for testing http_get_with_retry."""
+
+    def __init__(self, responses):
+        """responses is a list of FakeResponse or Exception to return in order."""
+        self.responses = list(responses)
+        self.calls = []
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append({"url": url, "params": params, "timeout": timeout})
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
+def test_http_get_with_retry_success():
+    """Test successful request on first try."""
+    session = FakeSession([FakeResponse(200)])
+
+    result = http_get_with_retry(session, "http://example.com")
+
+    assert result.status_code == 200
+    assert len(session.calls) == 1
+
+
+def test_http_get_with_retry_retry_then_success():
+    """Test retry after failure then success."""
+    session = FakeSession(
+        [
+            RequestException("network error"),
+            FakeResponse(200),
+        ]
+    )
+
+    result = http_get_with_retry(session, "http://example.com", max_retries=3, base_delay=0.001)
+
+    assert result.status_code == 200
+    assert len(session.calls) == 2
+
+
+def test_http_get_with_retry_all_retries_exhausted():
+    """Test that exception is raised after all retries exhausted."""
+    session = FakeSession(
+        [
+            RequestException("error 1"),
+            RequestException("error 2"),
+            RequestException("error 3"),
+        ]
+    )
+
+    with pytest.raises(RequestException):
+        http_get_with_retry(session, "http://example.com", max_retries=3, base_delay=0.001)
+
+    assert len(session.calls) == 3
+
+
+def test_http_get_with_retry_passes_params():
+    """Test that params and timeout are passed through."""
+    session = FakeSession([FakeResponse(200)])
+
+    http_get_with_retry(session, "http://example.com", params={"q": "test"}, timeout=30)
+
+    assert session.calls[0]["params"] == {"q": "test"}
+    assert session.calls[0]["timeout"] == 30
+
+
+def test_http_get_with_retry_raises_on_http_error():
+    """Test that HTTP errors trigger retry."""
+    session = FakeSession(
+        [
+            FakeResponse(500),
+            FakeResponse(200),
+        ]
+    )
+
+    result = http_get_with_retry(session, "http://example.com", max_retries=3, base_delay=0.001)
+
+    assert result.status_code == 200
+    assert len(session.calls) == 2
