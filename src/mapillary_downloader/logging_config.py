@@ -15,6 +15,7 @@ class ColoredFormatter(logging.Formatter):
         "DEBUG": "\033[94m",  # Blue
         "RESET": "\033[0m",
     }
+    CYAN = "\033[96m"
 
     def __init__(self, fmt=None, datefmt=None, use_color=True):
         """Initialize the formatter.
@@ -40,6 +41,10 @@ class ColoredFormatter(logging.Formatter):
             levelname = record.levelname
             if levelname in self.COLORS:
                 record.levelname = f"{self.COLORS[levelname]}{levelname}{self.COLORS['RESET']}"
+
+            # Color API messages differently so they stand out
+            if record.msg.startswith("API"):
+                record.msg = f"{self.CYAN}{record.msg}{self.COLORS['RESET']}"
 
         return super().format(record)
 
