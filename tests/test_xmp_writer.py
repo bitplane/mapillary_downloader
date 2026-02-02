@@ -137,6 +137,53 @@ def test_write_xmp_skips_missing_is_pano(tmp_path):
     assert result is False
 
 
+def test_write_xmp_skips_missing_dimensions(tmp_path):
+    """Test that XMP is not written when dimensions are missing."""
+    img = Image.new("RGB", (100, 100), color="red")
+    image_path = tmp_path / "no_dims.jpg"
+    img.save(image_path)
+
+    metadata = {
+        "id": "no_dims",
+        "is_pano": True,
+        # Missing width and height
+    }
+
+    result = write_xmp_to_image(image_path, metadata)
+    assert result is False
+
+
+def test_write_xmp_skips_invalid_jpeg(tmp_path):
+    """Test that XMP is not written for non-JPEG files."""
+    image_path = tmp_path / "not_a_jpeg.jpg"
+    image_path.write_bytes(b"this is not a jpeg file")
+
+    metadata = {
+        "id": "invalid",
+        "is_pano": True,
+        "width": 100,
+        "height": 100,
+    }
+
+    result = write_xmp_to_image(image_path, metadata)
+    assert result is False
+
+
+def test_write_xmp_handles_read_error(tmp_path):
+    """Test that XMP gracefully handles file read errors."""
+    image_path = tmp_path / "nonexistent.jpg"
+
+    metadata = {
+        "id": "missing",
+        "is_pano": True,
+        "width": 100,
+        "height": 100,
+    }
+
+    result = write_xmp_to_image(image_path, metadata)
+    assert result is False
+
+
 def test_write_xmp_with_compass(tmp_path):
     """Test writing XMP with compass heading."""
     img = Image.new("RGB", (6720, 3360), color="green")
