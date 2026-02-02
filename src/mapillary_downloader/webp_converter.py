@@ -17,25 +17,20 @@ def check_cwebp_available():
     return shutil.which("cwebp") is not None
 
 
-def convert_to_webp(jpg_path, output_path=None, delete_original=True):
+def convert_to_webp(jpg_path, output_path, delete_original=True):
     """Convert a JPG image to WebP format, preserving EXIF metadata.
 
     Args:
         jpg_path: Path to the JPG file
-        output_path: Optional path for the WebP output. If None, uses jpg_path with .webp extension
+        output_path: Path for the WebP output
         delete_original: Whether to delete the original JPG after conversion (default: True)
 
     Returns:
         Path object to the new WebP file, or None if conversion failed
     """
     jpg_path = Path(jpg_path)
-
-    if output_path is None:
-        webp_path = jpg_path.with_suffix(".webp")
-    else:
-        webp_path = Path(output_path)
-        # Ensure output directory exists
-        webp_path.parent.mkdir(parents=True, exist_ok=True)
+    webp_path = Path(output_path)
+    webp_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         # Convert with cwebp, preserving all metadata

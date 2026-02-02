@@ -65,53 +65,6 @@ class MetadataReader:
         except Exception:
             return False
 
-    def iter_images(self, quality_field=None, downloaded_ids=None):
-        """Stream images from metadata file with filtering.
-
-        Args:
-            quality_field: Optional field to check exists (e.g., 'thumb_1024_url')
-            downloaded_ids: Optional set of already downloaded IDs to skip
-
-        Yields:
-            Image metadata dicts that pass filters
-        """
-        if not self.metadata_file.exists():
-            return
-
-        # Handle gzipped files
-        if self.metadata_file.suffix == ".gz":
-            file_handle = gzip.open(self.metadata_file, "rt")
-        else:
-            file_handle = open(self.metadata_file)
-
-        with file_handle as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-
-                image = json.loads(line)
-
-                # Check for completion marker
-                if image.get("__complete__"):
-                    self.is_complete = True
-                    logger.debug("Found API fetch completion marker")
-                    continue
-
-                image_id = image.get("id")
-                if not image_id:
-                    continue
-
-                # Filter by downloaded status
-                if downloaded_ids and image_id in downloaded_ids:
-                    continue
-
-                # Filter by quality field availability
-                if quality_field and not image.get(quality_field):
-                    continue
-
-                yield image
-
     def get_all_ids(self):
         """Get set of all image IDs in metadata file.
 
