@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import requests
 from mapillary_downloader.utils import safe_json_save, http_get_with_retry, format_size
 from mapillary_downloader.downloader import get_cache_dir
 
@@ -11,8 +12,11 @@ logger = logging.getLogger("mapillary_downloader")
 CACHE_FILE = get_cache_dir() / ".stats.json"
 
 
-def search_ia_collections():
+def search_ia_collections(session):
     """Search IA for all mapillary_downloader collections.
+
+    Args:
+        session: requests.Session for connection pooling
 
     Returns:
         List of dicts with: identifier, description, item_size, collection
@@ -27,7 +31,7 @@ def search_ia_collections():
         "output": "json",
     }
 
-    response = http_get_with_retry(url, params=params, max_retries=3)
+    response = http_get_with_retry(session, url, params=params, max_retries=3)
     data = response.json()
 
     collections = data["response"]["docs"]
@@ -36,10 +40,11 @@ def search_ia_collections():
     return collections
 
 
-def fetch_uploader(identifier):
+def fetch_uploader(session, identifier):
     """Fetch uploader email from item metadata.
 
     Args:
+        session: requests.Session for connection pooling
         identifier: IA item identifier
 
     Returns:
@@ -47,7 +52,7 @@ def fetch_uploader(identifier):
     """
     url = f"https://archive.org/metadata/{identifier}/metadata/uploader"
     try:
-        response = http_get_with_retry(url, max_retries=2)
+        response = http_get_with_retry(session, url, max_retries=2)
         data = response.json()
         return data.get("result")
     except Exception:
@@ -195,10 +200,11 @@ def aggregate_stats(cache):
     return stats
 
 
-def format_stats(stats, cache):
+def format_stats(session, stats, cache):
     """Format statistics as human-readable text.
 
     Args:
+        session: requests.Session for connection pooling
         stats: Dict from aggregate_stats()
         cache: Dict of collection data
 
@@ -257,7 +263,7 @@ def format_stats(stats, cache):
         logger.info(f"Fetching uploader info for {len(need_uploader_fetch)} items...")
         for i, identifier in enumerate(need_uploader_fetch, 1):
             logger.info(f"  [{i}/{len(need_uploader_fetch)}] {identifier}")
-            uploader = fetch_uploader(identifier)
+            uploader = fetch_uploader(session, identifier)
             if uploader:
                 cache[identifier]["uploader"] = uploader
         # Save updated cache with uploaders
@@ -307,9 +313,11 @@ def show_stats(refresh=True):
     Args:
         refresh: If True, fetch fresh data from IA. If False, use cache only.
     """
+    session = requests.Session()
+
     if refresh:
         try:
-            ia_collections = search_ia_collections()
+            ia_collections = search_ia_collections(session)
             cache = update_cache(ia_collections)
         except Exception as e:
             logger.error(f"Failed to fetch IA data: {e}")
@@ -323,4 +331,4 @@ def show_stats(refresh=True):
         return
 
     stats = aggregate_stats(cache)
-    print(format_stats(stats, cache))
+    print(format_stats(session, stats, cache))

@@ -6,20 +6,20 @@ import requests
 logger = logging.getLogger("mapillary_downloader")
 
 
-def check_ia_exists(collection_name):
+def check_ia_exists(session, collection_name):
     """Check if a collection exists on Internet Archive.
 
     Args:
+        session: requests.Session for connection pooling
         collection_name: Name of the collection (e.g., mapillary-username-original-webp)
 
     Returns:
         Boolean indicating if the collection exists on IA
     """
-    # IA identifier format
     ia_url = f"https://archive.org/metadata/{collection_name}"
 
     try:
-        response = requests.get(ia_url, timeout=10)
+        response = session.get(ia_url, timeout=10)
         # If we get a 200, the item exists
         if response.status_code == 200:
             data = response.json()

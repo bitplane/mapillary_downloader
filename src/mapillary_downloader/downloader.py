@@ -8,6 +8,7 @@ import shutil
 import threading
 import time
 from pathlib import Path
+import requests
 from mapillary_downloader.utils import format_size, format_time, safe_json_save
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.ia_check import check_ia_exists
@@ -219,7 +220,7 @@ class MapillaryDownloader:
         # Check if collection already exists on Internet Archive
         if self.check_ia and self.collection_name:
             logger.info(f"Checking if {self.collection_name} exists on Internet Archive...")
-            if check_ia_exists(self.collection_name):
+            if check_ia_exists(requests.Session(), self.collection_name):
                 logger.info("Collection already exists on archive.org, skipping download")
                 return
 
