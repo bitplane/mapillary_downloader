@@ -43,7 +43,6 @@ def convert_to_webp(jpg_path, output_path=None, delete_original=True):
             ["cwebp", "-metadata", "all", str(jpg_path), "-o", str(webp_path)],
             capture_output=True,
             text=True,
-            timeout=60,
         )
 
         if result.returncode != 0:
@@ -55,9 +54,6 @@ def convert_to_webp(jpg_path, output_path=None, delete_original=True):
             jpg_path.unlink()
         return webp_path
 
-    except subprocess.TimeoutExpired:
-        logger.error(f"cwebp conversion timed out for {jpg_path}")
-        return None
     except Exception as e:
         logger.error(f"Error converting {jpg_path} to WebP: {e}")
         return None
