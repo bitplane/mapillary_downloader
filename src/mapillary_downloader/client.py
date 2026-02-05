@@ -22,11 +22,12 @@ class MapillaryClient:
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"OAuth {access_token}"})
 
-    def get_user_images(self, username, bbox=None, limit=2000):
+    def get_user_images(self, username, quality, bbox=None, limit=2000):
         """Get images uploaded by a specific user.
 
         Args:
             username: Mapillary username
+            quality: Image quality (256, 1024, 2048, or original)
             bbox: Optional bounding box [west, south, east, north]
             limit: Number of results per page (max 2000)
 
@@ -56,10 +57,7 @@ class MapillaryClient:
                     "computed_rotation",
                     "height",
                     "width",
-                    "thumb_256_url",
-                    "thumb_1024_url",
-                    "thumb_2048_url",
-                    "thumb_original_url",
+                    f"thumb_{quality}_url",
                 ]
             ),
         }

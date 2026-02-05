@@ -262,7 +262,7 @@ class MapillaryDownloader:
                     try:
                         logger.debug("API fetch thread starting")
                         with open(self.metadata_file, "a") as meta_f:
-                            for image in self.client.get_user_images(self.username, bbox=bbox):
+                            for image in self.client.get_user_images(self.username, self.quality, bbox=bbox):
                                 new_images_count[0] += 1
 
                                 # Save metadata (don't dedupe here, let the tailer handle it)

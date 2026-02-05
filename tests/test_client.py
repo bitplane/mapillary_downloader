@@ -25,7 +25,7 @@ def test_get_user_images_fields():
 
     client.session.get = Mock(return_value=mock_response)
 
-    images = list(client.get_user_images("testuser"))
+    images = list(client.get_user_images("testuser", "original"))
 
     assert len(images) == 1
     assert images[0]["id"] == "123"
@@ -37,6 +37,7 @@ def test_get_user_images_fields():
     fields = call_args[1]["params"]["fields"].split(",")
     assert "id" in fields
     assert "thumb_original_url" in fields
+    assert "thumb_256_url" not in fields
 
 
 def test_get_user_images_pagination():
@@ -56,7 +57,7 @@ def test_get_user_images_pagination():
 
     client.session.get = Mock(side_effect=[page1_response, page2_response])
 
-    images = list(client.get_user_images("testuser"))
+    images = list(client.get_user_images("testuser", "1024"))
 
     assert len(images) == 2
     assert images[0]["id"] == "1"
@@ -75,7 +76,7 @@ def test_get_user_images_with_bbox():
     client.session.get = Mock(return_value=mock_response)
 
     bbox = [-180, -90, 180, 90]
-    list(client.get_user_images("testuser", bbox=bbox))
+    list(client.get_user_images("testuser", "256", bbox=bbox))
 
     call_args = client.session.get.call_args
     assert "bbox" in call_args[1]["params"]
