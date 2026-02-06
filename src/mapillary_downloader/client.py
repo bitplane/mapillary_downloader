@@ -22,7 +22,7 @@ class MapillaryClient:
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"OAuth {access_token}"})
 
-    def get_user_images(self, username, quality, bbox=None, limit=2000):
+    def get_user_images(self, username, quality, bbox=None, limit=2000, start_url=None, on_page=None):
         """Get images uploaded by a specific user.
 
         Args:
@@ -30,6 +30,8 @@ class MapillaryClient:
             quality: Image quality (256, 1024, 2048, or original)
             bbox: Optional bounding box [west, south, east, north]
             limit: Number of results per page (max 2000)
+            start_url: Optional URL to resume pagination from
+            on_page: Optional callback(next_url) called after each page
 
         Yields:
             Image data dictionaries
@@ -65,7 +67,12 @@ class MapillaryClient:
         if bbox:
             params["bbox"] = ",".join(map(str, bbox))
 
-        url = f"{self.base_url}/images"
+        if start_url:
+            url = start_url
+            params = None  # Resume URL has params baked in
+            logger.info(f"Resuming API fetch from cursor")
+        else:
+            url = f"{self.base_url}/images"
         total_fetched = 0
 
         while url:
@@ -99,6 +106,10 @@ class MapillaryClient:
             # Get next page URL
             url = data.get("paging", {}).get("next")
             params = None  # Don't send params on subsequent requests, URL has them
+
+            # Notify caller of pagination progress (for cursor saving)
+            if on_page:
+                on_page(url)
 
             # Rate limiting: 10,000 requests/minute for search API
             time.sleep(0.01)

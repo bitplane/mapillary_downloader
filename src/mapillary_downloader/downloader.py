@@ -106,6 +106,7 @@ class MapillaryDownloader:
 
         self.metadata_file = self.output_dir / "metadata.jsonl"
         self.progress_file = self.output_dir / "progress.json"
+        self.cursor_file = self.output_dir / ".api_cursor"
         self.downloaded = self._load_progress()
         self._last_save_time = time.time()
 
@@ -257,12 +258,31 @@ class MapillaryDownloader:
             if not api_complete:
                 new_images_count = [0]  # Mutable so thread can update it
 
+                # Load cursor for resume
+                start_url = None
+                if self.cursor_file.exists():
+                    start_url = self.cursor_file.read_text().strip()
+                    if start_url:
+                        logger.info("Found API cursor, will resume from saved position")
+
+                def save_cursor(next_url):
+                    """Save pagination cursor atomically for resume."""
+                    if next_url:
+                        tmp = self.cursor_file.with_suffix(".tmp")
+                        tmp.write_text(next_url)
+                        tmp.rename(self.cursor_file)
+                    elif self.cursor_file.exists():
+                        self.cursor_file.unlink()
+
                 def fetch_api_metadata():
                     """Fetch metadata from API and write to file (runs in thread)."""
                     try:
                         logger.debug("API fetch thread starting")
                         with open(self.metadata_file, "a") as meta_f:
-                            for image in self.client.get_user_images(self.username, self.quality, bbox=bbox):
+                            for image in self.client.get_user_images(
+                                self.username, self.quality, bbox=bbox,
+                                start_url=start_url, on_page=save_cursor
+                            ):
                                 new_images_count[0] += 1
 
                                 # Save metadata (don't dedupe here, let the tailer handle it)
@@ -272,8 +292,10 @@ class MapillaryDownloader:
                                 if new_images_count[0] % 1000 == 0:
                                     logger.info(f"API: fetched {new_images_count[0]:,} image URLs")
 
-                            # Mark as complete
+                            # Mark as complete and remove cursor
                             MetadataReader.mark_complete(self.metadata_file)
+                            if self.cursor_file.exists():
+                                self.cursor_file.unlink()
                             logger.info(f"API fetch complete: {new_images_count[0]:,} images")
                     finally:
                         api_fetch_complete.set()
