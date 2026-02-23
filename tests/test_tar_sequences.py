@@ -309,3 +309,33 @@ def test_tar_multiple_addendums(tmp_path):
 
     # Third addendum created
     assert (collection / "2024-01-15.3.tar").exists()
+
+
+def test_tar_content_roundtrip(tmp_path):
+    """Test that file contents survive the tar round-trip intact."""
+    collection = tmp_path / "mapillary-test-original"
+    collection.mkdir()
+
+    date_dir = collection / "2024-06-01"
+    date_dir.mkdir()
+    seq_dir = date_dir / "seq_roundtrip"
+    seq_dir.mkdir()
+
+    # Various file sizes: empty, small, and larger with binary data
+    files = {
+        "empty.webp": b"",
+        "small.webp": b"hello world",
+        "binary.webp": bytes(range(256)) * 100,
+        "newlines.webp": b"line1\nline2\nline3\n",
+    }
+    for name, content in files.items():
+        (seq_dir / name).write_bytes(content)
+
+    tar_sequence_directories(collection)
+    tar_path = collection / "2024-06-01.tar"
+
+    with tarfile.open(tar_path) as tar:
+        for name, expected in files.items():
+            member_path = f"2024-06-01/seq_roundtrip/{name}"
+            extracted = tar.extractfile(member_path).read()
+            assert extracted == expected, f"{name}: content mismatch"
