@@ -38,9 +38,9 @@ def test_tar_sequences_basic(tmp_path):
 
     # Verify tar contents
     with tarfile.open(tar_path) as tar:
-        members = tar.getmembers()
-        assert len(members) == 3
-        names = sorted([m.name for m in members])
+        files = [m for m in tar.getmembers() if m.isfile()]
+        assert len(files) == 3
+        names = sorted([m.name for m in files])
         assert names == [
             "2024-01-15/seq_123/image1.webp",
             "2024-01-15/seq_123/image2.webp",
@@ -273,9 +273,9 @@ def test_tar_addendum_no_overwrite(tmp_path):
 
     # Verify addendum contents
     with tarfile.open(addendum_tar) as tar:
-        members = tar.getmembers()
-        assert len(members) == 1
-        assert members[0].name == "2024-01-15/seq_new/new_image.webp"
+        files = [m for m in tar.getmembers() if m.isfile()]
+        assert len(files) == 1
+        assert files[0].name == "2024-01-15/seq_new/new_image.webp"
 
     # Date directory should be gone
     assert not date_dir.exists()

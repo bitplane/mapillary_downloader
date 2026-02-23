@@ -2,11 +2,77 @@
 
 import logging
 import re
-import tarfile
+import shutil
+import subprocess
 from pathlib import Path
+
 from mapillary_downloader.utils import format_size
 
 logger = logging.getLogger("mapillary_downloader")
+
+
+def tar_date_directory(collection_dir, date_dir):
+    """Tar a single date directory using GNU tar.
+
+    Args:
+        collection_dir: Path to collection directory (working directory for tar)
+        date_dir: Path to date directory to tar
+
+    Returns:
+        Tuple of (tar_path, file_count) on success, or (None, 0) on failure
+    """
+    date_name = date_dir.name
+
+    # Find next available tar filename (don't overwrite existing tars)
+    tar_path = collection_dir / f"{date_name}.tar"
+    if tar_path.exists():
+        addendum = 1
+        while True:
+            tar_path = collection_dir / f"{date_name}.{addendum}.tar"
+            if not tar_path.exists():
+                break
+            addendum += 1
+        logger.info(f"Existing tar for {date_name}, creating addendum: {tar_path.name}")
+
+    # Count files first to skip empty dirs
+    file_count = sum(1 for f in date_dir.rglob("*") if f.is_file())
+    if file_count == 0:
+        logger.warning(f"Skipping empty date directory: {date_name}")
+        return None, 0
+
+    logger.info(f"Tarring date '{date_name}' ({file_count} files)...")
+
+    result = subprocess.run(
+        [
+            "tar",
+            "cf",
+            str(tar_path),
+            "--sort=name",
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            date_name,
+        ],
+        cwd=collection_dir,
+        capture_output=True,
+    )
+
+    if result.returncode != 0:
+        logger.error(f"tar failed for {date_name}: {result.stderr.decode()}")
+        if tar_path.exists():
+            tar_path.unlink()
+        return None, 0
+
+    if not tar_path.exists() or tar_path.stat().st_size == 0:
+        logger.error(f"Tar file empty or not created: {tar_path}")
+        if tar_path.exists():
+            tar_path.unlink()
+        return None, 0
+
+    # Remove original date directory
+    shutil.rmtree(date_dir)
+
+    return tar_path, file_count
 
 
 def tar_sequence_directories(collection_dir):
@@ -27,13 +93,11 @@ def tar_sequence_directories(collection_dir):
         return 0, 0
 
     # Find all date directories (skip special dirs)
-    # Date format: YYYY-MM-DD or unknown-date
     skip_dirs = {".meta", "__pycache__"}
     date_dirs = []
 
     for item in collection_dir.iterdir():
         if item.is_dir() and item.name not in skip_dirs:
-            # Check if this is a date dir (YYYY-MM-DD) or unknown-date
             if re.match(r"\d{4}-\d{2}-\d{2}$", item.name) or item.name == "unknown-date":
                 date_dirs.append(item)
 
@@ -41,7 +105,6 @@ def tar_sequence_directories(collection_dir):
         logger.info("No date directories to tar")
         return 0, 0
 
-    # Sort date directories chronologically (YYYY-MM-DD sorts naturally)
     date_dirs = sorted(date_dirs, key=lambda x: x.name)
 
     logger.info(f"Tarring {len(date_dirs)} date directories...")
@@ -51,84 +114,13 @@ def tar_sequence_directories(collection_dir):
     total_tar_bytes = 0
 
     for date_dir in date_dirs:
-        date_name = date_dir.name
-
-        # Find next available tar filename (don't overwrite existing tars)
-        tar_path = collection_dir / f"{date_name}.tar"
-        if tar_path.exists():
-            # Find next available addendum number
-            addendum = 1
-            while True:
-                tar_path = collection_dir / f"{date_name}.{addendum}.tar"
-                if not tar_path.exists():
-                    break
-                addendum += 1
-            logger.info(f"Existing tar for {date_name}, creating addendum: {tar_path.name}")
-
-        # Count files in date directory
-        files_to_tar = sorted([f for f in date_dir.rglob("*") if f.is_file()], key=lambda x: str(x))
-        file_count = len(files_to_tar)
-
-        if file_count == 0:
-            logger.warning(f"Skipping empty date directory: {date_name}")
-            continue
-
-        try:
-            logger.info(f"Tarring date '{date_name}' ({file_count} files)...")
-
-            # Create reproducible uncompressed tar (WebP already compressed)
-            with tarfile.open(tar_path, "w") as tar:
-                for file_path in files_to_tar:
-                    # Get path relative to collection_dir for tar archive
-                    arcname = file_path.relative_to(collection_dir)
-
-                    # Create TarInfo for reproducibility
-                    tarinfo = tar.gettarinfo(str(file_path), arcname=str(arcname))
-
-                    # Normalize for reproducibility across platforms
-                    tarinfo.uid = 0
-                    tarinfo.gid = 0
-                    tarinfo.uname = ""
-                    tarinfo.gname = ""
-                    # mtime already set on file by worker, preserve it
-
-                    # Add file to tar
-                    with open(file_path, "rb") as f:
-                        tar.addfile(tarinfo, f)
-
-            # Verify tar was created and has size
-            if tar_path.exists() and tar_path.stat().st_size > 0:
-                tar_size = tar_path.stat().st_size
-                total_tar_bytes += tar_size
-
-                # Remove original date directory
-                for file in date_dir.rglob("*"):
-                    if file.is_file():
-                        file.unlink()
-
-                # Remove empty subdirs and main dir
-                for subdir in list(date_dir.rglob("*")):
-                    if subdir.is_dir():
-                        try:
-                            subdir.rmdir()
-                        except OSError:
-                            pass  # Not empty yet
-
-                date_dir.rmdir()
-
-                tarred_count += 1
-                total_files += file_count
-
-                logger.info(f"Tarred date '{date_name}': {file_count:,} files, {format_size(tar_size)}")
-            else:
-                logger.error(f"Tar file empty or not created: {tar_path}")
-                if tar_path.exists():
-                    tar_path.unlink()
-
-        except Exception as e:
-            logger.error(f"Error tarring date {date_name}: {e}")
-            if tar_path.exists():
-                tar_path.unlink()
+        tar_path, file_count = tar_date_directory(collection_dir, date_dir)
+        if tar_path:
+            tar_size = tar_path.stat().st_size
+            total_tar_bytes += tar_size
+            tarred_count += 1
+            total_files += file_count
+            logger.info(f"Tarred date '{date_dir.name}': {file_count:,} files, {format_size(tar_size)}")
 
     logger.info(f"Tarred {tarred_count} dates ({total_files:,} files, {format_size(total_tar_bytes)} total tar size)")
     return tarred_count, total_files
