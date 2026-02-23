@@ -1,5 +1,6 @@
 """Tar sequence directories for efficient Internet Archive uploads."""
 
+import functools
 import logging
 import re
 import shutil
@@ -11,8 +12,16 @@ from mapillary_downloader.utils import format_size
 logger = logging.getLogger("mapillary_downloader")
 
 
+@functools.cache
+def _is_gnu_tar():
+    """Detect whether the system tar is GNU tar."""
+    result = subprocess.run(["tar", "--help"], capture_output=True)
+    output = result.stdout.decode() + result.stderr.decode()
+    return "gnu" in output.lower()
+
+
 def tar_date_directory(collection_dir, date_dir):
-    """Tar a single date directory using GNU tar.
+    """Tar a single date directory.
 
     Args:
         collection_dir: Path to collection directory (working directory for tar)
@@ -34,25 +43,23 @@ def tar_date_directory(collection_dir, date_dir):
             addendum += 1
         logger.info(f"Existing tar for {date_name}, creating addendum: {tar_path.name}")
 
-    # Count files first to skip empty dirs
-    file_count = sum(1 for f in date_dir.rglob("*") if f.is_file())
-    if file_count == 0:
+    # Build sorted file list relative to collection_dir
+    files = sorted(str(f.relative_to(collection_dir)) for f in date_dir.rglob("*") if f.is_file())
+    if not files:
         logger.warning(f"Skipping empty date directory: {date_name}")
         return None, 0
 
+    file_count = len(files)
     logger.info(f"Tarring date '{date_name}' ({file_count} files)...")
 
+    if _is_gnu_tar():
+        ownership_flags = ["--owner=0", "--group=0", "--numeric-owner"]
+    else:
+        ownership_flags = ["--uid", "0", "--gid", "0"]
+
     result = subprocess.run(
-        [
-            "tar",
-            "cf",
-            str(tar_path),
-            "--sort=name",
-            "--owner=0",
-            "--group=0",
-            "--numeric-owner",
-            date_name,
-        ],
+        ["tar", "cf", str(tar_path)] + ownership_flags + ["-T", "-"],
+        input="\n".join(files).encode(),
         cwd=collection_dir,
         capture_output=True,
     )
