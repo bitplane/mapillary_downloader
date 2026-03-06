@@ -119,10 +119,11 @@ def main():
         client = MapillaryClient(args.token)
 
         # Process each username
-        for username in args.usernames:
+        total_users = len(args.usernames)
+        for idx, username in enumerate(args.usernames, start=1):
             logger.info("")
             logger.info("=" * 60)
-            logger.info(f"Processing user: {username}")
+            logger.info(f"Processing user: {username} ({idx}/{total_users})")
             logger.info("=" * 60)
             logger.info("")
 
