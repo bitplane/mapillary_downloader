@@ -3,13 +3,12 @@
 import gzip
 import json
 import logging
-import os
 import shutil
 import threading
 import time
 from pathlib import Path
 import requests
-from mapillary_downloader.utils import format_size, format_time, safe_json_save
+from mapillary_downloader.utils import format_size, format_time, get_cache_dir, safe_json_save
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.ia_check import check_ia_exists
 from mapillary_downloader.worker import worker_process
@@ -19,23 +18,6 @@ from mapillary_downloader.tar_sequences import tar_sequence_directories
 from mapillary_downloader.logging_config import add_file_handler
 
 logger = logging.getLogger("mapillary_downloader")
-
-
-def get_cache_dir():
-    """Get XDG cache directory for staging downloads.
-
-    Returns:
-        Path to cache directory for mapillary_downloader
-    """
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    if xdg_cache:
-        cache_dir = Path(xdg_cache)
-    else:
-        cache_dir = Path.home() / ".cache"
-
-    mapillary_cache = cache_dir / "mapillary_downloader"
-    mapillary_cache.mkdir(parents=True, exist_ok=True)
-    return mapillary_cache
 
 
 class MapillaryDownloader:
@@ -280,8 +262,7 @@ class MapillaryDownloader:
                         logger.debug("API fetch thread starting")
                         with open(self.metadata_file, "a") as meta_f:
                             for image in self.client.get_user_images(
-                                self.username, self.quality, bbox=bbox,
-                                start_url=start_url, on_page=save_cursor
+                                self.username, self.quality, bbox=bbox, start_url=start_url, on_page=save_cursor
                             ):
                                 new_images_count[0] += 1
 

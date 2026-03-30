@@ -4,8 +4,7 @@ import json
 import logging
 import re
 import requests
-from mapillary_downloader.utils import safe_json_save, http_get_with_retry, format_size
-from mapillary_downloader.downloader import get_cache_dir
+from mapillary_downloader.utils import safe_json_save, http_get_with_retry, format_size, get_cache_dir
 
 logger = logging.getLogger("mapillary_downloader")
 

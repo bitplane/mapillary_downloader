@@ -10,6 +10,23 @@ from requests.exceptions import RequestException
 logger = logging.getLogger("mapillary_downloader")
 
 
+def get_cache_dir():
+    """Get XDG cache directory for staging downloads.
+
+    Returns:
+        Path to cache directory for mapillary_downloader
+    """
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache:
+        cache_dir = Path(xdg_cache)
+    else:
+        cache_dir = Path.home() / ".cache"
+
+    mapillary_cache = cache_dir / "mapillary_downloader"
+    mapillary_cache.mkdir(parents=True, exist_ok=True)
+    return mapillary_cache
+
+
 def format_size(bytes_count):
     """Format bytes as human-readable size.
 
