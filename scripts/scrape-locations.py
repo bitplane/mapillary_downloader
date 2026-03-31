@@ -17,6 +17,8 @@ from pathlib import Path
 # Ensure the package is importable when run from the repo root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+import requests
+
 from mapillary_downloader.client_web import location_search
 from mapillary_downloader.utils import get_cache_dir
 
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 CITIES_FILE = get_cache_dir() / "cities.txt"
 OUTPUT_FILE = get_cache_dir() / "locations.json"
-DELAY = 2.0
+DELAY = 5.0
 MAX_RETRIES = 3
 
 
@@ -53,6 +55,17 @@ def search_with_retry(city):
     for attempt in range(MAX_RETRIES):
         try:
             return location_search(city)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 400:
+                logger.error("Got 400 for %r, stopping.", city)
+                sys.exit(1)
+            logger.warning("Attempt %d/%d for %r failed: %s", attempt + 1, MAX_RETRIES, city, e)
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(delay)
+                delay *= 2
+            else:
+                logger.error("All retries exhausted for %r", city)
+                return None
         except Exception as e:
             logger.warning("Attempt %d/%d for %r failed: %s", attempt + 1, MAX_RETRIES, city, e)
             if attempt < MAX_RETRIES - 1:
