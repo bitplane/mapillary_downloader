@@ -156,6 +156,28 @@ class MapillaryDownloader:
         # Write atomically using utility function
         safe_json_save(self.progress_file, progress)
 
+    def _create_thumbnail(self):
+        """Copy the first image found to the collection root as a thumbnail.
+
+        IA doesn't support webp thumbnails, so webp images are converted to PNG.
+        """
+        import subprocess
+
+        ext = ".webp" if self.convert_webp else ".jpg"
+        for path in self.output_dir.rglob(f"*{ext}"):
+            if self.convert_webp:
+                dest = self.output_dir / "__ia_thumb__.png"
+                result = subprocess.run(["dwebp", str(path), "-o", str(dest)], capture_output=True)
+                if result.returncode != 0:
+                    logger.warning("Failed to convert thumbnail: %s", result.stderr.decode())
+                    return
+            else:
+                dest = self.output_dir / "__ia_thumb__.jpg"
+                shutil.copy2(path, dest)
+            logger.info("Thumbnail: %s", dest.name)
+            return
+        logger.warning("No images found for thumbnail")
+
     def _submit_metadata_batch(self, file_handle, quality_field, pool, convert_webp, process_results, base_submitted):
         """Read metadata lines from current position, submit to workers.
 
@@ -412,6 +434,9 @@ class MapillaryDownloader:
             f"{len(self.downloaded):,} total, skipped {skipped_count:,}, failed {failed_count:,}"
         )
         logger.info(f"Total time: {format_time(elapsed)}")
+
+        # Copy one image to root as thumbnail for IA
+        self._create_thumbnail()
 
         # Tar sequence directories for efficient IA uploads
         if self.tar_sequences:
