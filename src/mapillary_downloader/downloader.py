@@ -20,6 +20,31 @@ from mapillary_downloader.logging_config import add_file_handler
 logger = logging.getLogger("mapillary_downloader")
 
 
+def clean_log_only_dirs():
+    """Remove cache directories that contain only log files."""
+    cache_dir = get_cache_dir()
+    removed = 0
+
+    for path in sorted(cache_dir.iterdir()):
+        if not path.is_dir() or not path.name.startswith("mapillary-"):
+            continue
+
+        contents = list(path.iterdir())
+        if not contents:
+            continue
+
+        if all(f.name.startswith("download.log.") for f in contents):
+            log_count = len(contents)
+            shutil.rmtree(path)
+            logger.info("Removed %s (%d log files)", path.name, log_count)
+            removed += 1
+
+    if removed:
+        logger.info("Removed %d directories", removed)
+    else:
+        logger.info("No log-only directories found")
+
+
 class MapillaryDownloader:
     """Handles downloading Mapillary data for a user."""
 

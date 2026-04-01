@@ -66,6 +66,11 @@ def main():
         action="store_true",
         help="Show statistics of collections on archive.org and exit",
     )
+    parser.add_argument(
+        "--clean-up",
+        action="store_true",
+        help="Remove cache directories that contain only log files and exit",
+    )
 
     args = parser.parse_args()
 
@@ -74,6 +79,13 @@ def main():
         from mapillary_downloader.ia_stats import show_stats
 
         show_stats()
+        sys.exit(0)
+
+    # Handle --clean-up early (before token check)
+    if args.clean_up:
+        from mapillary_downloader.downloader import clean_log_only_dirs
+
+        clean_log_only_dirs()
         sys.exit(0)
 
     # Set debug logging level if requested
