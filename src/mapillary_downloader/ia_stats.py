@@ -152,6 +152,15 @@ def update_cache(ia_collections):
     return cache
 
 
+def get_archived_usernames():
+    """Get the set of usernames already archived on archive.org.
+
+    Reads from the local stats cache. Run --stats first to populate.
+    """
+    cache = load_cache()
+    return {entry["username"] for entry in cache.values() if entry.get("username")}
+
+
 def aggregate_stats(cache):
     """Aggregate statistics from cached collection data.
 

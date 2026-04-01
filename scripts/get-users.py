@@ -17,9 +17,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from mapillary_downloader.utils import get_cache_dir
+from mapillary_downloader.ia_stats import get_archived_usernames
 
 parser = argparse.ArgumentParser(description="Extract users from leaderboards")
 parser.add_argument("--pattern", default=".*", help="Regex pattern to match against location name (default: .*)")
+parser.add_argument(
+    "--exclude-archived", action="store_true", help="Exclude users already on archive.org (uses --stats cache)"
+)
 args = parser.parse_args()
 
 leaderboards_file = get_cache_dir() / "leaderboards.json"
@@ -40,5 +44,8 @@ for loc_id, entry in data.items():
         if username not in users or count > users[username]:
             users[username] = count
 
+archived = get_archived_usernames() if args.exclude_archived else set()
+
 for username, count in sorted(users.items(), key=lambda x: x[1]):
-    print(f"{count}\t{username}")
+    if username not in archived:
+        print(f"{count}\t{username}")
