@@ -9,14 +9,10 @@ Resumable — skips cities already processed. Saves after each city.
 
 import json
 import logging
-import os
-import sys
 import time
 
-import requests
-
-from mapillary_downloader.client_web import location_search
-from mapillary_downloader.utils import get_cache_dir
+from mapillary_downloader.client_web import call_with_retry, location_search
+from mapillary_downloader.utils import get_cache_dir, safe_json_save
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +23,6 @@ logger = logging.getLogger(__name__)
 CITIES_FILE = get_cache_dir() / "cities.txt"
 OUTPUT_FILE = get_cache_dir() / "locations.json"
 DELAY = 10.0
-MAX_RETRIES = 3
 
 
 def load_progress():
@@ -35,41 +30,6 @@ def load_progress():
         with open(OUTPUT_FILE) as f:
             return json.load(f)
     return {"_city_index": 0, "locations": {}}
-
-
-def save_progress(data):
-    tmp = OUTPUT_FILE.with_suffix(".json.tmp")
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        f.flush()
-        os.fsync(f.fileno())
-    tmp.rename(OUTPUT_FILE)
-
-
-def search_with_retry(city):
-    delay = DELAY
-    for attempt in range(MAX_RETRIES):
-        try:
-            return location_search(city)
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 400:
-                logger.error("Got 400 for %r, stopping.", city)
-                sys.exit(1)
-            logger.warning("Attempt %d/%d for %r failed: %s", attempt + 1, MAX_RETRIES, city, e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(delay)
-                delay *= 2
-            else:
-                logger.error("All retries exhausted for %r", city)
-                return None
-        except Exception as e:
-            logger.warning("Attempt %d/%d for %r failed: %s", attempt + 1, MAX_RETRIES, city, e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(delay)
-                delay *= 2
-            else:
-                logger.error("All retries exhausted for %r", city)
-                return None
 
 
 def main():
@@ -88,7 +48,7 @@ def main():
         city = cities[i]
         logger.info("[%d/%d] Searching: %s", i + 1, len(cities), city)
 
-        results = search_with_retry(city)
+        results = call_with_retry(location_search, city)
         changed = False
         if results is not None:
             for r in results:
@@ -101,7 +61,7 @@ def main():
         prev_index = data["_city_index"]
         data["_city_index"] = i + 1
         if changed or data["_city_index"] != prev_index:
-            save_progress(data)
+            safe_json_save(OUTPUT_FILE, data)
 
     logger.info("Done. %d locations discovered.", len(data["locations"]))
 

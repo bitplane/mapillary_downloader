@@ -3,7 +3,9 @@
 import json
 import logging
 import re
+import time
 from functools import lru_cache
+
 import requests
 
 logger = logging.getLogger("mapillary_downloader")
@@ -157,6 +159,37 @@ def get_leaderboard(key: str = "global") -> dict:
     if "errors" in data:
         raise RuntimeError(f"GraphQL error: {data['errors']}")
     return data["data"]["user_leaderboards"]
+
+
+def call_with_retry(fn, *args, max_retries=3, base_delay=5.0):
+    """Call fn with retries and exponential backoff.
+
+    Stops immediately on HTTP 400 (raises SystemExit).
+    Returns None if all retries are exhausted.
+    """
+    delay = base_delay
+    for attempt in range(max_retries):
+        try:
+            return fn(*args)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 400:
+                logger.error("Got 400, stopping.")
+                raise SystemExit(1)
+            logger.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                time.sleep(delay)
+                delay *= 2
+            else:
+                logger.error("All retries exhausted")
+                return None
+        except Exception as e:
+            logger.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                time.sleep(delay)
+                delay *= 2
+            else:
+                logger.error("All retries exhausted")
+                return None
 
 
 def discover_users(key: str = "global") -> list[tuple[str, int]]:

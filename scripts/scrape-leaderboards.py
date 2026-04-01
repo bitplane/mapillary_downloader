@@ -8,14 +8,11 @@ Usage:
 
 import json
 import logging
-import os
 import sys
 import time
 
-import requests
-
-from mapillary_downloader.client_web import get_leaderboard
-from mapillary_downloader.utils import get_cache_dir
+from mapillary_downloader.client_web import call_with_retry, get_leaderboard
+from mapillary_downloader.utils import get_cache_dir, safe_json_save
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +23,6 @@ logger = logging.getLogger(__name__)
 OUTPUT_FILE = get_cache_dir() / "leaderboards.json"
 LOCATIONS_FILE = get_cache_dir() / "locations.json"
 DELAY = 1.0
-MAX_RETRIES = 3
 
 
 def load_data():
@@ -36,46 +32,11 @@ def load_data():
     return {}
 
 
-def save_data(data):
-    tmp = OUTPUT_FILE.with_suffix(".json.tmp")
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        f.flush()
-        os.fsync(f.fileno())
-    tmp.rename(OUTPUT_FILE)
-
-
 def load_locations():
     if LOCATIONS_FILE.exists():
         with open(LOCATIONS_FILE) as f:
             return json.load(f).get("locations", {})
     return {}
-
-
-def fetch_with_retry(loc_id):
-    delay = DELAY
-    for attempt in range(MAX_RETRIES):
-        try:
-            return get_leaderboard(loc_id)
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 400:
-                logger.error("Got 400 for %s, stopping.", loc_id)
-                sys.exit(1)
-            logger.warning("Attempt %d/%d for %s failed: %s", attempt + 1, MAX_RETRIES, loc_id, e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(delay)
-                delay *= 2
-            else:
-                logger.error("All retries exhausted for %s", loc_id)
-                return None
-        except Exception as e:
-            logger.warning("Attempt %d/%d for %s failed: %s", attempt + 1, MAX_RETRIES, loc_id, e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(delay)
-                delay *= 2
-            else:
-                logger.error("All retries exhausted for %s", loc_id)
-                return None
 
 
 def main():
@@ -113,11 +74,11 @@ def main():
         name = loc_info[1]
         logger.info("[%d/%d] Fetching leaderboard: %s (%s)", i + 1, len(loc_ids), name, loc_id)
 
-        leaderboard = fetch_with_retry(loc_id)
+        leaderboard = call_with_retry(get_leaderboard, loc_id)
         if leaderboard is not None:
             users = sum(len(leaderboard[k]) for k in ("lifetime", "month", "week"))
             data[loc_id] = {"name": name, "leaderboard": leaderboard}
-            save_data(data)
+            safe_json_save(OUTPUT_FILE, data)
             last_mtime = OUTPUT_FILE.stat().st_mtime
             logger.info("  %d user entries", users)
 
