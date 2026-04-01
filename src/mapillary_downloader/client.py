@@ -70,7 +70,7 @@ class MapillaryClient:
         if start_url:
             url = start_url
             params = None  # Resume URL has params baked in
-            logger.info(f"Resuming API fetch from cursor")
+            logger.info("Resuming API fetch from cursor")
         else:
             url = f"{self.base_url}/images"
         total_fetched = 0

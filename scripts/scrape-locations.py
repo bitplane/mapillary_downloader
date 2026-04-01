@@ -12,10 +12,6 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
-
-# Ensure the package is importable when run from the repo root
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import requests
 
@@ -86,20 +82,26 @@ def main():
     )
 
     for i in range(start_index, len(cities)):
+        if i > start_index:
+            time.sleep(DELAY)
+
         city = cities[i]
         logger.info("[%d/%d] Searching: %s", i + 1, len(cities), city)
 
         results = search_with_retry(city)
+        changed = False
         if results is not None:
             for r in results:
                 loc_id = r["key"]
                 if loc_id not in data["locations"]:
                     data["locations"][loc_id] = [r["type"], r["name"]]
                     logger.info("  + %s: %s (%s)", loc_id, r["name"], r["type"])
+                    changed = True
 
+        prev_index = data["_city_index"]
         data["_city_index"] = i + 1
-        save_progress(data)
-        time.sleep(DELAY)
+        if changed or data["_city_index"] != prev_index:
+            save_progress(data)
 
     logger.info("Done. %d locations discovered.", len(data["locations"]))
 

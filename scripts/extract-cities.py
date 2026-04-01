@@ -8,9 +8,6 @@ Requires download-geonames.py to have been run first.
 import csv
 import gzip
 import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from mapillary_downloader.utils import get_cache_dir
 

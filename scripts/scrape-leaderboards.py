@@ -11,9 +11,6 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import requests
 
@@ -28,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_FILE = get_cache_dir() / "leaderboards.json"
 LOCATIONS_FILE = get_cache_dir() / "locations.json"
-DELAY = 5.0
+DELAY = 1.0
 MAX_RETRIES = 3
 
 
@@ -94,9 +91,23 @@ def main():
 
     last_mtime = OUTPUT_FILE.stat().st_mtime if OUTPUT_FILE.exists() else 0
 
+    first = True
     for i, loc_id in enumerate(loc_ids):
         if loc_id in data:
             continue
+
+        if not first:
+            time.sleep(DELAY)
+        first = False
+
+        # Reload if file was modified externally
+        if OUTPUT_FILE.exists():
+            mtime = OUTPUT_FILE.stat().st_mtime
+            if mtime != last_mtime:
+                data = load_data()
+                last_mtime = mtime
+                if loc_id in data:
+                    continue
 
         loc_info = locations.get(loc_id, ["unknown", f"ID {loc_id}"])
         name = loc_info[1]
@@ -107,16 +118,8 @@ def main():
             users = sum(len(leaderboard[k]) for k in ("lifetime", "month", "week"))
             data[loc_id] = {"name": name, "leaderboard": leaderboard}
             save_data(data)
+            last_mtime = OUTPUT_FILE.stat().st_mtime
             logger.info("  %d user entries", users)
-
-        time.sleep(DELAY)
-
-        # Reload if file was modified externally
-        if OUTPUT_FILE.exists():
-            mtime = OUTPUT_FILE.stat().st_mtime
-            if mtime != last_mtime:
-                data = load_data()
-                last_mtime = mtime
 
     logger.info("Done. %d leaderboards scraped.", len(data))
 

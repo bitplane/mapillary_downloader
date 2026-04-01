@@ -2,10 +2,6 @@
 """Download the OSMNames geonames planet dump if not already cached."""
 
 import logging
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import requests
 

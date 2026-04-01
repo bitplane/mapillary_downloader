@@ -11,13 +11,13 @@ Output: headerless TSV, count<TAB>username, sorted by count ascending.
 import argparse
 import json
 import re
+import signal
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from mapillary_downloader.utils import get_cache_dir
 from mapillary_downloader.ia_stats import get_archived_usernames
+from mapillary_downloader.utils import get_cache_dir
+
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 parser = argparse.ArgumentParser(description="Extract users from leaderboards")
 parser.add_argument("--pattern", default=".*", help="Regex pattern to match against location name (default: .*)")

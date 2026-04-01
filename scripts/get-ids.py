@@ -10,12 +10,11 @@ Usage:
 import argparse
 import json
 import re
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+import signal
 
 from mapillary_downloader.utils import get_cache_dir
+
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 parser = argparse.ArgumentParser(description="Query location IDs from locations.json")
 parser.add_argument("--pattern", default=".*", help="Regex pattern to match against name (default: .*)")
