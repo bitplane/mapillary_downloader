@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 CITIES_FILE = get_cache_dir() / "cities.txt"
 OUTPUT_FILE = get_cache_dir() / "locations.json"
-DELAY = 5.0
+DELAY = 10.0
 MAX_RETRIES = 3
 
 
