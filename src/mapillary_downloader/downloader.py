@@ -283,6 +283,7 @@ class MapillaryDownloader:
         try:
             # Step 3a: Fetch metadata from API in parallel (write-only, don't block on queue)
             api_fetch_complete = threading.Event()
+            api_fetch_error = [None]  # Mutable so thread can store exception
 
             if not api_complete:
                 new_images_count = [0]  # Mutable so thread can update it
@@ -325,6 +326,9 @@ class MapillaryDownloader:
                             if self.cursor_file.exists():
                                 self.cursor_file.unlink()
                             logger.info(f"API fetch complete: {new_images_count[0]:,} images")
+                    except Exception as e:
+                        api_fetch_error[0] = e
+                        logger.error(f"API fetch failed: {e}")
                     finally:
                         api_fetch_complete.set()
 
@@ -430,10 +434,23 @@ class MapillaryDownloader:
         elapsed = time.time() - start_time
 
         logger.info(
-            f"Complete! Downloaded {downloaded_count:,} this session ({format_size(total_bytes)}), "
+            f"Session: {downloaded_count:,} downloaded ({format_size(total_bytes)}), "
             f"{len(self.downloaded):,} total, skipped {skipped_count:,}, failed {failed_count:,}"
         )
         logger.info(f"Total time: {format_time(elapsed)}")
+
+        # If API fetch failed or nothing was downloaded, leave staging dir for retry
+        if api_fetch_error[0] is not None:
+            logger.error("API fetch failed, leaving staging dir for retry: %s", self.staging_dir)
+            self.file_handler.close()
+            logger.removeHandler(self.file_handler)
+            raise api_fetch_error[0]
+
+        if downloaded_count == 0 and not self.downloaded:
+            logger.warning("No images downloaded, leaving staging dir for retry: %s", self.staging_dir)
+            self.file_handler.close()
+            logger.removeHandler(self.file_handler)
+            return
 
         # Copy one image to root as thumbnail for IA
         self._create_thumbnail()
@@ -444,22 +461,23 @@ class MapillaryDownloader:
 
         # Gzip metadata.jsonl to save space
         if self.metadata_file.exists():
-            logger.info("Compressing metadata.jsonl...")
             original_size = self.metadata_file.stat().st_size
-            gzipped_file = self.metadata_file.with_suffix(".jsonl.gz")
+            if original_size > 0:
+                logger.info("Compressing metadata.jsonl...")
+                gzipped_file = self.metadata_file.with_suffix(".jsonl.gz")
 
-            with open(self.metadata_file, "rb") as f_in:
-                with gzip.open(gzipped_file, "wb", compresslevel=9) as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+                with open(self.metadata_file, "rb") as f_in:
+                    with gzip.open(gzipped_file, "wb", compresslevel=9) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
 
-            compressed_size = gzipped_file.stat().st_size
-            self.metadata_file.unlink()
+                compressed_size = gzipped_file.stat().st_size
+                self.metadata_file.unlink()
 
-            savings = 100 * (1 - compressed_size / original_size)
-            logger.info(
-                f"Compressed metadata: {format_size(original_size)} → {format_size(compressed_size)} "
-                f"({savings:.1f}% savings)"
-            )
+                savings = 100 * (1 - compressed_size / original_size)
+                logger.info(
+                    f"Compressed metadata: {format_size(original_size)} → {format_size(compressed_size)} "
+                    f"({savings:.1f}% savings)"
+                )
 
         # Generate IA metadata
         generate_ia_metadata(self.output_dir)

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_FILE = get_cache_dir() / "leaderboards.json"
 LOCATIONS_FILE = get_cache_dir() / "locations.json"
-DELAY = 1.0
+DELAY = 0.2
 
 
 def load_data():

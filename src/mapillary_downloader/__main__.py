@@ -131,6 +131,7 @@ def main():
         client = MapillaryClient(args.token)
 
         # Process each username
+        failed_users = []
         for username in args.usernames:
             logger.info("")
             logger.info("=" * 60)
@@ -138,17 +139,25 @@ def main():
             logger.info("=" * 60)
             logger.info("")
 
-            downloader = MapillaryDownloader(
-                client,
-                args.output,
-                username,
-                args.quality,
-                max_workers=args.max_workers,
-                tar_sequences=not args.no_tar,
-                convert_webp=convert_webp,
-                check_ia=not args.no_check_ia,
-            )
-            downloader.download_user_data(bbox=bbox, convert_webp=convert_webp)
+            try:
+                downloader = MapillaryDownloader(
+                    client,
+                    args.output,
+                    username,
+                    args.quality,
+                    max_workers=args.max_workers,
+                    tar_sequences=not args.no_tar,
+                    convert_webp=convert_webp,
+                    check_ia=not args.no_check_ia,
+                )
+                downloader.download_user_data(bbox=bbox, convert_webp=convert_webp)
+            except Exception as e:
+                logger.error(f"Failed to process {username}: {e}")
+                failed_users.append(username)
+
+        if failed_users:
+            logger.error(f"Failed users: {', '.join(failed_users)}")
+            sys.exit(1)
 
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")

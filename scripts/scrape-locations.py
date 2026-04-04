@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 CITIES_FILE = get_cache_dir() / "cities.txt"
 OUTPUT_FILE = get_cache_dir() / "locations.json"
-DELAY = 10.0
+DELAY = 3.0
 
 
 def load_progress():
