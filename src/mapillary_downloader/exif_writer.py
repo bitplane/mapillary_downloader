@@ -104,10 +104,14 @@ def write_exif_to_image(image_path, metadata):
         # GPS Altitude - prefer raw altitude (photogrammetry can't compute elevation)
         altitude = metadata.get("altitude") or metadata.get("computed_altitude")
         if altitude is not None:
-            altitude_val = int(abs(altitude) * 100)
-            logger.debug(f"Raw altitude value: {altitude}, calculated: {altitude_val}")
-            exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (altitude_val, 100)
-            exif_dict["GPS"][piexif.GPSIFD.GPSAltitudeRef] = 1 if altitude < 0 else 0
+            # Mapillary sometimes returns unsigned-wrapped negatives (e.g. 4294967281 = -15 as int32)
+            if altitude > 100000:
+                altitude = altitude - 4294967296 if altitude > 2147483647 else None
+            if altitude is not None and abs(altitude) <= 100000:
+                altitude_val = int(abs(altitude) * 100)
+                logger.debug(f"Raw altitude value: {altitude}, calculated: {altitude_val}")
+                exif_dict["GPS"][piexif.GPSIFD.GPSAltitude] = (altitude_val, 100)
+                exif_dict["GPS"][piexif.GPSIFD.GPSAltitudeRef] = 1 if altitude < 0 else 0
 
         # GPS Compass direction
         compass = metadata.get("computed_compass_angle") or metadata.get("compass_angle")
