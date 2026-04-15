@@ -14,6 +14,9 @@ CACHE_FILE = get_cache_dir() / ".stats.json"
 def search_ia_collections(session):
     """Search IA for all mapillary_downloader collections.
 
+    Uses the scrape API with cursor pagination so we get every matching item
+    rather than a 10k-capped subset.
+
     Args:
         session: requests.Session for connection pooling
 
@@ -22,18 +25,33 @@ def search_ia_collections(session):
     """
     logger.info("Searching archive.org for mapillary_downloader collections...")
 
-    url = "https://archive.org/advancedsearch.php"
-    params = {
+    url = "https://archive.org/services/search/v1/scrape"
+    base_params = {
         "q": "mapillary_downloader:*",
-        "fl[]": ["identifier", "description", "item_size", "collection"],
-        "rows": 10000,
-        "output": "json",
+        "fields": "identifier,description,item_size,collection",
+        "count": 10000,
     }
 
-    response = http_get_with_retry(session, url, params=params, max_retries=3)
-    data = response.json()
+    collections = []
+    cursor = None
+    page = 0
+    while True:
+        params = dict(base_params)
+        if cursor:
+            params["cursor"] = cursor
 
-    collections = data["response"]["docs"]
+        response = http_get_with_retry(session, url, params=params, max_retries=3)
+        data = response.json()
+
+        items = data.get("items", [])
+        collections.extend(items)
+        page += 1
+        logger.debug(f"Scrape page {page}: {len(items):,} items (total so far: {len(collections):,})")
+
+        cursor = data.get("cursor")
+        if not cursor or not items:
+            break
+
     logger.info(f"Found {len(collections):,} collections on archive.org")
 
     return collections
@@ -100,14 +118,18 @@ def load_cache():
 
 
 def update_cache(ia_collections):
-    """Update cache with new IA search results.
+    """Rebuild cache from a complete IA scrape.
 
-    Merges new collections into existing cache.
+    The scrape API returns the full result set, so we rebuild the cache from
+    scratch and drop identifiers that no longer exist on IA. Uploader values,
+    which come from a separate metadata endpoint, are preserved from the prior
+    cache for identifiers that still exist.
 
     Returns:
         Updated cache dict
     """
-    cache = load_cache()
+    prior = load_cache()
+    cache = {}
 
     for item in ia_collections:
         identifier = item.get("identifier")
@@ -119,25 +141,19 @@ def update_cache(ia_collections):
             logger.debug(f"Skipping non-mapillary collection: {identifier}")
             continue
 
-        # Parse item data
         size_bytes = item.get("item_size", 0)
         if isinstance(size_bytes, str):
             size_bytes = int(size_bytes)
 
         image_count = extract_image_count(item.get("description"))
 
-        # Get IA collection(s) - can be a string or list
         ia_collection = item.get("collection", [])
         if isinstance(ia_collection, str):
             ia_collection = [ia_collection]
 
-        # Preserve existing uploader if we have it cached
-        existing = cache.get(identifier, {})
-
-        # Update cache entry
         cache[identifier] = {
             "size": size_bytes,
-            "uploader": existing.get("uploader"),  # Preserve cached uploader
+            "uploader": prior.get(identifier, {}).get("uploader"),
             "images": image_count,
             "quality": info["quality"],
             "username": info["username"],
@@ -145,7 +161,6 @@ def update_cache(ia_collections):
             "ia_collection": ia_collection,
         }
 
-    # Save updated cache
     safe_json_save(CACHE_FILE, cache)
     logger.info(f"Updated cache with {len(cache):,} collections")
 
