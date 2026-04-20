@@ -247,17 +247,17 @@ class MapillaryDownloader:
         if not self.username or not self.quality:
             raise ValueError("Username and quality must be provided during initialization")
 
+        # Check if collection already exists in final destination
+        if self.final_dir.exists():
+            logger.info(f"Collection already exists at {self.final_dir}, skipping download")
+            return
+
         # Check if collection already exists on Internet Archive
         if self.check_ia and self.collection_name:
             logger.info(f"Checking if {self.collection_name} exists on Internet Archive...")
             if check_ia_exists(requests.Session(), self.collection_name):
                 logger.info("Collection already exists on archive.org, skipping download")
                 return
-
-        # Check if collection already exists in final destination
-        if self.final_dir.exists():
-            logger.info(f"Collection already exists at {self.final_dir}, skipping download")
-            return
 
         quality_field = f"thumb_{self.quality}_url"
 
