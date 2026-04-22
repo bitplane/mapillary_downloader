@@ -13,6 +13,9 @@ logger = logging.getLogger("mapillary_downloader")
 GRAPHQL_URL = "https://graph.mapillary.com/graphql"
 LOCATION_SEARCH_URL = "https://graph.mapillary.com/location_search"
 
+# Meta's GraphQL endpoint expects a pre-registered `doc` string (whitespace-preserved,
+# matched against server-side allowlist) alongside a canonical `query` string. Both are
+# sent as separate request params; the two constants below are intentionally near-identical.
 LEADERBOARD_DOC = """query getUserLeaderboard($key: String!) {
         user_leaderboards(key: $key) {
           lifetime {

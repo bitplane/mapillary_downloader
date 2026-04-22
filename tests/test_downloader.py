@@ -32,14 +32,14 @@ def test_load_progress_empty(tmp_path):
 
 def test_load_progress_existing(tmp_path):
     """Test loading progress from existing file."""
-    staging_dir = tmp_path / "download"
+    staging_dir = tmp_path / "mapillary-testuser-original"
     staging_dir.mkdir()
     progress_file = staging_dir / "progress.json"
-    progress_file.write_text(json.dumps({"downloaded": ["img1", "img2"]}))
+    progress_file.write_text(json.dumps({"original": ["img1", "img2"], "1024": ["other"]}))
 
     mock_client = Mock()
     with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path):
-        downloader = MapillaryDownloader(mock_client, tmp_path)
+        downloader = MapillaryDownloader(mock_client, tmp_path, username="testuser", quality="original")
 
         assert len(downloader.downloaded) == 2
         assert "img1" in downloader.downloaded

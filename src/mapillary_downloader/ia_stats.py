@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import requests
+from mapillary_downloader.ia_meta import parse_collection_info
 from mapillary_downloader.utils import safe_json_save, http_get_with_retry, format_size, get_cache_dir
 
 logger = logging.getLogger("mapillary_downloader")
@@ -74,18 +75,6 @@ def fetch_uploader(session, identifier):
         return data.get("result")
     except Exception:
         return None
-
-
-def parse_collection_info(identifier):
-    """Parse username, quality, webp from collection identifier.
-
-    Returns:
-        dict with username, quality, is_webp or None if invalid
-    """
-    match = re.match(r"mapillary-(.+)-(256|1024|2048|original)(?:-webp)?$", identifier)
-    if match:
-        return {"username": match.group(1), "quality": match.group(2), "is_webp": "-webp" in identifier}
-    return None
 
 
 def extract_image_count(description):

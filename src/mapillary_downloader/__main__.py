@@ -1,11 +1,13 @@
 """CLI entry point."""
 
 import argparse
+import logging
 import os
 import sys
 from importlib.metadata import version
 from mapillary_downloader.client import MapillaryClient
-from mapillary_downloader.downloader import MapillaryDownloader
+from mapillary_downloader.downloader import MapillaryDownloader, clean_log_only_dirs
+from mapillary_downloader.ia_stats import show_stats
 from mapillary_downloader.logging_config import setup_logging
 from mapillary_downloader.webp_converter import check_cwebp_available
 
@@ -76,22 +78,16 @@ def main():
 
     # Handle --stats early (before token check)
     if args.stats:
-        from mapillary_downloader.ia_stats import show_stats
-
         show_stats()
         sys.exit(0)
 
     # Handle --clean-up early (before token check)
     if args.clean_up:
-        from mapillary_downloader.downloader import clean_log_only_dirs
-
         clean_log_only_dirs()
         sys.exit(0)
 
     # Set debug logging level if requested
     if args.debug:
-        import logging
-
         logging.getLogger("mapillary_downloader").setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled")
 
@@ -151,7 +147,7 @@ def main():
                     convert_webp=convert_webp,
                     check_ia=not args.no_check_ia,
                 )
-                downloader.download_user_data(bbox=bbox, convert_webp=convert_webp)
+                downloader.download_user_data(bbox=bbox)
             except Exception as e:
                 logger.error(f"Failed to process {username}: {e}")
                 failed_users.append(username)

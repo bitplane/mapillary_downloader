@@ -1,6 +1,7 @@
 """Worker process for parallel image download and conversion."""
 
 import os
+import shutil
 import signal
 import tempfile
 from datetime import datetime
@@ -138,11 +139,5 @@ def download_and_convert_image(image_data, output_dir, quality, convert_webp, se
     except Exception as e:
         return (image_id, 0, False, str(e))
     finally:
-        # Clean up temp directory if it was created
-        if temp_dir and Path(temp_dir).exists():
-            try:
-                for file in Path(temp_dir).glob("*"):
-                    file.unlink()
-                Path(temp_dir).rmdir()
-            except Exception:
-                pass  # Best effort cleanup
+        if temp_dir:
+            shutil.rmtree(temp_dir, ignore_errors=True)

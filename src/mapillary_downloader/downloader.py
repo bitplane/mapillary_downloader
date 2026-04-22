@@ -125,17 +125,7 @@ class MapillaryDownloader:
         if self.progress_file.exists():
             with open(self.progress_file) as f:
                 data = json.load(f)
-                # Support both old format (single list) and new format (per-quality dict)
-                if isinstance(data, dict):
-                    if "downloaded" in data:
-                        # Old format: {"downloaded": [...]}
-                        return set(data["downloaded"])
-                    else:
-                        # New format: {"256": [...], "1024": [...], ...}
-                        return set(data.get(str(self.quality), []))
-                else:
-                    # Very old format: just a list
-                    return set(data)
+            return set(data.get(str(self.quality), []))
         return set()
 
     def _baseline_bytes(self):
@@ -153,23 +143,15 @@ class MapillaryDownloader:
 
     def _save_progress(self):
         """Save progress to disk atomically, per-quality."""
-        # Load existing progress for all qualities
+        progress = {}
         if self.progress_file.exists():
             with open(self.progress_file) as f:
                 data = json.load(f)
-                # Convert old format to new format if needed
-                if isinstance(data, dict) and "downloaded" in data:
-                    # Old format: {"downloaded": [...]} - migrate to per-quality
-                    progress = {}
-                else:
-                    progress = data if isinstance(data, dict) else {}
-        else:
-            progress = {}
+                if isinstance(data, dict):
+                    progress = data
 
-        # Update this quality's progress
         progress[str(self.quality)] = list(self.downloaded)
 
-        # Write atomically using utility function
         safe_json_save(self.progress_file, progress)
 
     def _create_thumbnail(self):
@@ -185,14 +167,13 @@ class MapillaryDownloader:
             return
         logger.warning("No images found for thumbnail")
 
-    def _submit_metadata_batch(self, file_handle, quality_field, pool, convert_webp, process_results, base_submitted):
+    def _submit_metadata_batch(self, file_handle, quality_field, pool, process_results, base_submitted):
         """Read metadata lines from current position, submit to workers.
 
         Args:
             file_handle: Open file positioned at read point
             quality_field: Field name for quality URL (e.g., "thumb_1024_url")
             pool: Worker pool to submit to
-            convert_webp: Whether to convert to webp
             process_results: Callback to drain result queue
             base_submitted: Running total for cumulative logging
 
@@ -230,7 +211,7 @@ class MapillaryDownloader:
                 image,
                 str(self.output_dir),
                 self.quality,
-                convert_webp,
+                self.convert_webp,
                 self.client.access_token,
             )
             pool.submit(work_item)
@@ -244,12 +225,11 @@ class MapillaryDownloader:
 
         return submitted, skipped
 
-    def download_user_data(self, bbox=None, convert_webp=False):
+    def download_user_data(self, bbox=None):
         """Download all images for a user using streaming queue-based architecture.
 
         Args:
             bbox: Optional bounding box [west, south, east, north]
-            convert_webp: Convert images to WebP format after download
         """
         if not self.username or not self.quality:
             raise ValueError("Username and quality must be provided during initialization")
@@ -391,7 +371,7 @@ class MapillaryDownloader:
                     with open(self.metadata_file) as f:
                         f.seek(last_position)
                         batch_submitted, batch_skipped = self._submit_metadata_batch(
-                            f, quality_field, pool, convert_webp, process_results, submitted
+                            f, quality_field, pool, process_results, submitted
                         )
                         submitted += batch_submitted
                         skipped_count += batch_skipped

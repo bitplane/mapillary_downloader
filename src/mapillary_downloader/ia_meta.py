@@ -11,19 +11,21 @@ from importlib.metadata import version
 logger = logging.getLogger("mapillary_downloader")
 
 
-def parse_collection_name(directory):
-    """Parse username and quality from directory name.
+def parse_collection_info(name):
+    """Parse username, quality, and webp flag from a collection name or directory path.
 
     Args:
-        directory: Path to collection directory (e.g., mapillary-username-original or mapillary-username-original-webp)
+        name: Collection identifier (e.g., "mapillary-username-original-webp")
+              or path to a collection directory. Paths are reduced to their basename.
 
     Returns:
-        Tuple of (username, quality) or (None, None) if parsing fails
+        dict with keys "username", "quality", "is_webp", or None if parsing fails.
     """
-    match = re.match(r"mapillary-(.+)-(256|1024|2048|original)(?:-webp)?$", Path(directory).name)
+    basename = Path(name).name
+    match = re.match(r"mapillary-(.+)-(256|1024|2048|original)(?:-webp)?$", basename)
     if match:
-        return match.group(1), match.group(2)
-    return None, None
+        return {"username": match.group(1), "quality": match.group(2), "is_webp": "-webp" in basename}
+    return None
 
 
 def get_date_range(metadata_file):
@@ -110,11 +112,14 @@ def generate_ia_metadata(collection_dir):
         True if successful, False otherwise
     """
     collection_dir = Path(collection_dir)
-    username, quality = parse_collection_name(collection_dir)
+    info = parse_collection_info(collection_dir)
 
-    if not username or not quality:
+    if not info:
         logger.error(f"Could not parse username/quality from directory: {collection_dir.name}")
         return False
+
+    username = info["username"]
+    quality = info["quality"]
 
     metadata_file = collection_dir / "metadata.jsonl.gz"
     if not metadata_file.exists():
