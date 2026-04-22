@@ -132,10 +132,11 @@ def main():
 
         # Process each username
         failed_users = []
-        for username in args.usernames:
+        total_users = len(args.usernames)
+        for i, username in enumerate(args.usernames, 1):
             logger.info("")
             logger.info("=" * 60)
-            logger.info(f"Processing user: {username}")
+            logger.info(f"Processing user: {username} ({i}/{total_users})")
             logger.info("=" * 60)
             logger.info("")
 

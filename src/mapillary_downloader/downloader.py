@@ -3,6 +3,7 @@
 import gzip
 import json
 import logging
+import re
 import shutil
 import threading
 import time
@@ -115,6 +116,7 @@ class MapillaryDownloader:
         self.progress_file = self.output_dir / "progress.json"
         self.cursor_file = self.output_dir / ".api_cursor"
         self.downloaded = self._load_progress()
+        self.baseline_bytes = self._baseline_bytes()
         self._last_save_time = time.time()
 
     def _load_progress(self):
@@ -134,6 +136,19 @@ class MapillaryDownloader:
                     # Very old format: just a list
                     return set(data)
         return set()
+
+    def _baseline_bytes(self):
+        """Sum sizes of already-downloaded image files in date directories."""
+        total = 0
+        for child in self.output_dir.iterdir():
+            if not child.is_dir():
+                continue
+            if not (re.match(r"\d{4}-\d{2}-\d{2}$", child.name) or child.name == "unknown-date"):
+                continue
+            for f in child.rglob("*"):
+                if f.is_file():
+                    total += f.stat().st_size
+        return total
 
     def _save_progress(self):
         """Save progress to disk atomically, per-quality."""
@@ -362,7 +377,11 @@ class MapillaryDownloader:
                         total_downloaded = len(self.downloaded)
                         should_log = downloaded_count <= 10 or downloaded_count % 100 == 0
                         if should_log:
-                            logger.info(f"Downloaded: {total_downloaded:,} ({format_size(total_bytes)} this session)")
+                            logger.info(
+                                f"Downloaded: {total_downloaded:,} "
+                                f"({format_size(total_bytes)} this session, "
+                                f"{format_size(self.baseline_bytes + total_bytes)} total)"
+                            )
 
                         if downloaded_count % 100 == 0:
                             pool.check_throughput(downloaded_count)
@@ -416,7 +435,11 @@ class MapillaryDownloader:
                     total_bytes += bytes_dl
 
                     if downloaded_count % 100 == 0:
-                        logger.info(f"Downloaded: {len(self.downloaded):,} ({format_size(total_bytes)} this session)")
+                        logger.info(
+                            f"Downloaded: {len(self.downloaded):,} "
+                            f"({format_size(total_bytes)} this session, "
+                            f"{format_size(self.baseline_bytes + total_bytes)} total)"
+                        )
                         pool.check_throughput(downloaded_count)
                         # Save progress every 5 minutes
                         if time.time() - self._last_save_time >= 300:
