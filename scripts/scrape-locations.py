@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 LOCATIONS_TSV = get_cache_dir() / "locations.tsv"
 OUTPUT_FILE = get_cache_dir() / "locations.json"
-DELAY = 3.0
+DELAY = 0.2
 
 
 def load_progress():
