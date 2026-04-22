@@ -9,6 +9,7 @@ import threading
 import time
 from pathlib import Path
 import requests
+from PIL import Image
 from mapillary_downloader.utils import format_size, format_time, get_cache_dir, safe_json_save
 from mapillary_downloader.ia_meta import generate_ia_metadata
 from mapillary_downloader.ia_check import check_ia_exists
@@ -172,23 +173,14 @@ class MapillaryDownloader:
         safe_json_save(self.progress_file, progress)
 
     def _create_thumbnail(self):
-        """Copy the first image found to the collection root as a thumbnail.
-
-        IA doesn't support webp thumbnails, so webp images are converted to PNG.
-        """
-        import subprocess
-
+        """Create a 256x256 JPEG thumbnail at the collection root for IA."""
+        dest = self.output_dir / "__ia_thumb__.jpg"
         ext = ".webp" if self.convert_webp else ".jpg"
         for path in self.output_dir.rglob(f"*{ext}"):
-            if self.convert_webp:
-                dest = self.output_dir / "__ia_thumb__.png"
-                result = subprocess.run(["dwebp", str(path), "-o", str(dest)], capture_output=True)
-                if result.returncode != 0:
-                    logger.warning("Failed to convert thumbnail: %s", result.stderr.decode())
-                    return
-            else:
-                dest = self.output_dir / "__ia_thumb__.jpg"
-                shutil.copy2(path, dest)
+            with Image.open(path) as img:
+                img = img.convert("RGB")
+                img.thumbnail((256, 256))
+                img.save(dest, "JPEG")
             logger.info("Thumbnail: %s", dest.name)
             return
         logger.warning("No images found for thumbnail")
