@@ -300,7 +300,7 @@ class MapillaryDownloader:
                     if next_url:
                         tmp = self.cursor_file.with_suffix(".tmp")
                         tmp.write_text(next_url)
-                        tmp.rename(self.cursor_file)
+                        tmp.replace(self.cursor_file)
                     elif self.cursor_file.exists():
                         self.cursor_file.unlink()
 
