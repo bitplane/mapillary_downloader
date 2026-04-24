@@ -10,28 +10,7 @@ def test_metadata_reader_empty(tmp_path):
     """Test reading from non-existent file."""
     reader = MetadataReader(tmp_path / "nonexistent.jsonl")
 
-    ids = reader.get_all_ids()
-    assert len(ids) == 0
     assert not reader.is_complete
-
-
-def test_metadata_reader_basic(tmp_path):
-    """Test reading basic metadata."""
-    metadata_file = tmp_path / "metadata.jsonl"
-
-    # Write some test data
-    with open(metadata_file, "w") as f:
-        f.write(json.dumps({"id": "img1", "thumb_original_url": "http://example.com/1.jpg"}) + "\n")
-        f.write(json.dumps({"id": "img2", "thumb_original_url": "http://example.com/2.jpg"}) + "\n")
-        f.write(json.dumps({"id": "img3", "thumb_1024_url": "http://example.com/3.jpg"}) + "\n")
-
-    reader = MetadataReader(metadata_file)
-
-    ids = reader.get_all_ids()
-    assert len(ids) == 3
-    assert "img1" in ids
-    assert "img2" in ids
-    assert "img3" in ids
 
 
 def test_metadata_reader_completion_marker(tmp_path):
@@ -46,13 +25,7 @@ def test_metadata_reader_completion_marker(tmp_path):
 
     reader = MetadataReader(metadata_file)
 
-    # Check completion detected
-    ids = reader.get_all_ids()
     assert reader.is_complete
-
-    # Completion marker should not be in IDs
-    assert len(ids) == 2
-    assert "__complete__" not in str(ids)
 
 
 def test_metadata_reader_mark_complete(tmp_path):
@@ -68,9 +41,7 @@ def test_metadata_reader_mark_complete(tmp_path):
 
     # Verify marker was added
     reader = MetadataReader(metadata_file)
-    ids = reader.get_all_ids()
     assert reader.is_complete
-    assert len(ids) == 1
 
 
 def test_metadata_reader_gzip(tmp_path):
@@ -86,41 +57,6 @@ def test_metadata_reader_gzip(tmp_path):
     reader = MetadataReader(metadata_file)
 
     assert reader.is_complete
-    ids = reader.get_all_ids()
-    assert len(ids) == 2
-
-
-def test_metadata_reader_empty_lines(tmp_path):
-    """Test handling of empty lines in metadata file."""
-    metadata_file = tmp_path / "metadata.jsonl"
-
-    # Write data with empty lines
-    with open(metadata_file, "w") as f:
-        f.write(json.dumps({"id": "img1"}) + "\n")
-        f.write("\n")  # empty line
-        f.write("   \n")  # whitespace-only line
-        f.write(json.dumps({"id": "img2"}) + "\n")
-
-    reader = MetadataReader(metadata_file)
-    ids = reader.get_all_ids()
-    assert len(ids) == 2
-
-
-def test_metadata_reader_missing_id(tmp_path):
-    """Test handling of entries without id."""
-    metadata_file = tmp_path / "metadata.jsonl"
-
-    # Write data including entry without id
-    with open(metadata_file, "w") as f:
-        f.write(json.dumps({"id": "img1"}) + "\n")
-        f.write(json.dumps({"no_id": "here"}) + "\n")
-        f.write(json.dumps({"id": "img2"}) + "\n")
-
-    reader = MetadataReader(metadata_file)
-    ids = reader.get_all_ids()
-    assert len(ids) == 2
-    assert "img1" in ids
-    assert "img2" in ids
 
 
 def test_metadata_reader_many_lines(tmp_path):
@@ -135,5 +71,3 @@ def test_metadata_reader_many_lines(tmp_path):
 
     reader = MetadataReader(metadata_file)
     assert reader.is_complete
-    ids = reader.get_all_ids()
-    assert len(ids) == 15

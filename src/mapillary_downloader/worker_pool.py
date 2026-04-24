@@ -10,11 +10,15 @@ logger = logging.getLogger("mapillary_downloader")
 
 
 class AdaptiveWorkerPool:
-    """Worker pool that scales based on throughput.
+    """Worker pool that ramps up based on throughput.
 
-    Monitors throughput every 30 seconds and adjusts worker count:
+    Monitors throughput periodically and increases worker count when download
+    throughput is still improving. It does not currently scale workers down:
+    when throughput drops, it stops adding more workers.
+
+    Current adjustment behavior:
     - If throughput increasing: add workers (up to max)
-    - If throughput plateauing/decreasing: reduce workers
+    - If throughput plateauing/decreasing: keep the current worker count
     """
 
     def __init__(self, worker_func, max_workers=16, monitoring_interval=10):

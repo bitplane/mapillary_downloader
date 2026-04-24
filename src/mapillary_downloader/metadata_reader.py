@@ -65,42 +65,6 @@ class MetadataReader:
         except Exception:
             return False
 
-    def get_all_ids(self):
-        """Get set of all image IDs in metadata file.
-
-        Returns:
-            Set of image IDs (for building seen_ids)
-        """
-        ids = set()
-
-        if not self.metadata_file.exists():
-            return ids
-
-        # Handle gzipped files
-        if self.metadata_file.suffix == ".gz":
-            file_handle = gzip.open(self.metadata_file, "rt")
-        else:
-            file_handle = open(self.metadata_file)
-
-        with file_handle as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-
-                image = json.loads(line)
-
-                # Skip completion marker
-                if image.get("__complete__"):
-                    self.is_complete = True
-                    continue
-
-                image_id = image.get("id")
-                if image_id:
-                    ids.add(image_id)
-
-        return ids
-
     @staticmethod
     def mark_complete(metadata_file):
         """Append completion marker to metadata file.

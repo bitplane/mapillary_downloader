@@ -39,6 +39,9 @@ mapillary-downloader --output ./downloads USERNAME1
 | `--max-workers` | Maximum number of parallel download workers  | CPU count          |
 | `--no-tar`      | Don't tar bucket directories                 | `False`            |
 | `--no-check-ia` | Don't check if exists on Internet Archive    | `False`            |
+| `--debug`       | Enable verbose downloader logging            | `False`            |
+| `--stats`       | Show archive.org collection statistics       | `False`            |
+| `--clean-up`    | Remove cache dirs containing only log files   | `False`            |
 
 The downloader will:
 
@@ -48,7 +51,6 @@ The downloader will:
      compass direction) and XMP data for panoramas.
 * 🗜️ Convert to WebP (by default) to save ~70% disk space
 * 🛟 Save progress every 5 minutes so you can safely resume if interrupted
-     ()
 * 📦 Tar sequence directories (by default) for faster uploads to Internet
      Archive
 

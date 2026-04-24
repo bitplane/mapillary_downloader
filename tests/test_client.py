@@ -1,7 +1,6 @@
 """Tests for the Mapillary API client."""
 
-from unittest.mock import Mock, patch
-from requests.exceptions import RequestException
+from unittest.mock import Mock
 from mapillary_downloader.client import MapillaryClient
 
 
@@ -81,38 +80,3 @@ def test_get_user_images_with_bbox():
     call_args = client.session.get.call_args
     assert "bbox" in call_args[1]["params"]
     assert call_args[1]["params"]["bbox"] == "-180,-90,180,90"
-
-
-def test_download_image_success(tmp_path):
-    """Test successful image download."""
-    client = MapillaryClient("test_token")
-
-    image_data = b"fake image data"
-    mock_response = Mock()
-    mock_response.iter_content = Mock(return_value=[image_data])
-    mock_response.raise_for_status = Mock()
-
-    client.session.get = Mock(return_value=mock_response)
-
-    output_path = tmp_path / "test.jpg"
-    result = client.download_image("http://example.com/image.jpg", output_path)
-
-    assert result == 15  # len(b"fake image data")
-    assert output_path.exists()
-    assert output_path.read_bytes() == image_data
-
-
-def test_download_image_failure(tmp_path, caplog):
-    """Test failed image download."""
-    client = MapillaryClient("test_token")
-
-    client.session.get = Mock(side_effect=RequestException("Network error"))
-
-    output_path = tmp_path / "test.jpg"
-    with patch("time.sleep"):
-        result = client.download_image("http://example.com/image.jpg", output_path)
-
-    assert result == 0
-    assert not output_path.exists()
-
-    assert "Error downloading" in caplog.text

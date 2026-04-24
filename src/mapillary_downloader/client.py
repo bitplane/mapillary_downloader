@@ -113,38 +113,3 @@ class MapillaryClient:
 
             # Rate limiting: 10,000 requests/minute for search API
             time.sleep(0.01)
-
-    def download_image(self, image_url, output_path):
-        """Download an image from a URL.
-
-        Args:
-            image_url: URL of the image to download
-            output_path: Path to save the image
-
-        Returns:
-            Number of bytes downloaded if successful, 0 otherwise
-        """
-        max_retries = 10
-        base_delay = 1.0
-
-        for attempt in range(max_retries):
-            try:
-                response = self.session.get(image_url, stream=True, timeout=60)
-                response.raise_for_status()
-
-                total_bytes = 0
-                with open(output_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        total_bytes += len(chunk)
-
-                return total_bytes
-            except RequestException as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Error downloading {image_url} after {max_retries} attempts: {e}")
-                    return 0
-
-                delay = base_delay * (2**attempt)
-                logger.warning(f"Download failed (attempt {attempt + 1}/{max_retries}): {e}")
-                logger.info(f"Retrying in {delay:.1f} seconds...")
-                time.sleep(delay)
