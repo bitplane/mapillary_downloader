@@ -29,3 +29,11 @@ All discovery caches live under the `mapillary_downloader` XDG cache directory.
 
 The discovery files are intentionally reused between runs to avoid repeating
 large scraping jobs.
+
+Profile totals can be added with `scripts/update-user-counts.py USER [USER ...]`.
+Each lifetime entry keeps its regional `count`; optional `total_count` stores the
+user's global profile image total. `get-users.py` prefers this total when present,
+falling back to the largest regional count. The updater skips users whose total
+is already cached, saves after each successful lookup, and pauses five seconds
+between requests (`--delay` overrides this). Rerunning the same user list resumes
+unfinished lookups. `--file` selects another leaderboard JSON for release work.

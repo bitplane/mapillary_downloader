@@ -1,4 +1,4 @@
-"""Profile totals must replace all lifetime entries without corrupting other counts."""
+"""Profile totals preserve regional counts and allow interrupted updates to resume."""
 
 import importlib.util
 import json
@@ -33,13 +33,19 @@ def test_updates_all_entries_and_pauses(tmp_path, monkeypatch):
     def fetch(username):
         if username == "b":
             saved = json.loads(filename.read_text())
-            assert saved["two"]["leaderboard"]["lifetime"][0]["count"] == 100
+            assert saved["two"]["leaderboard"]["lifetime"][0]["total_count"] == 100
         return {"a": 100, "b": 200}[username]
 
     monkeypatch.setattr(script, "get_profile_image_count", fetch)
     assert script.main(["a", "a", "b", "--file", str(filename)]) == 0
     result = json.loads(filename.read_text())
-    assert [r["count"] for r in result["one"]["leaderboard"]["lifetime"]] == [100, 200]
+    assert [r["total_count"] for r in result["one"]["leaderboard"]["lifetime"]] == [100, 200]
+    assert script.main(["a", "b", "--file", str(filename)]) == 0
+    sleep.assert_called_once_with(5.0)
+    for location in result.values():
+        for entry in location["leaderboard"]["lifetime"]:
+            del entry["total_count"]
+    assert result == original
     assert result["one"]["leaderboard"]["week"] == original["one"]["leaderboard"]["week"]
     assert result["two"]["leaderboard"]["month"] == original["two"]["leaderboard"]["month"]
     sleep.assert_called_once_with(5.0)
@@ -70,3 +76,28 @@ def test_profile_accepts_zero(monkeypatch):
     monkeypatch.setattr(client_web, "get_web_token", lambda: "token")
     monkeypatch.setattr(client_web.requests, "get", lambda *a, **kw: response)
     assert client_web.get_profile_image_count("a") == 0
+
+
+def test_get_users_prefers_total_and_excludes_archived(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    cache = tmp_path / "mapillary_downloader"
+    cache.mkdir()
+    rows = [
+        {"user": {"username": "updated"}, "count": 10, "total_count": 100},
+        {"user": {"username": "pending"}, "count": 20},
+        {"user": {"username": "empty"}, "count": 5, "total_count": 0},
+        {"user": {"username": "archived"}, "count": 1, "total_count": 200},
+    ]
+    (cache / "leaderboards.json").write_text(json.dumps({"x": {"name": "X", "leaderboard": {"lifetime": rows}}}))
+    (cache / ".stats.json").write_text(json.dumps({"item": {"username": "archived"}}))
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).parents[1] / "scripts" / "get-users.py"), "--exclude-archived"],
+        env={**os.environ, "XDG_CACHE_HOME": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout == "0\tempty\n20\tpending\n100\tupdated\n"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replace cached lifetime leaderboard counts with global profile totals."""
+"""Cache global profile totals alongside regional leaderboard counts."""
 
 import argparse
 import json
@@ -44,9 +44,13 @@ def main(argv=None):
     failed = False
     requested = False
     for username in dict.fromkeys(args.usernames):
-        if not lifetime_entries(data, username):
+        entries = lifetime_entries(data, username)
+        if not entries:
             logger.error("%s is not in the lifetime leaderboards; skipping", username)
             failed = True
+            continue
+        if any("total_count" in entry for entry in entries):
+            logger.info("%s: total already cached; skipping", username)
             continue
         if requested:
             time.sleep(args.delay)
@@ -63,11 +67,10 @@ def main(argv=None):
             logger.error("%s disappeared from the cache; skipping", username)
             failed = True
             continue
-        old_counts = sorted({entry["count"] for entry in entries})
         for entry in entries:
-            entry["count"] = count
+            entry["total_count"] = count
         safe_json_save(filename, data)
-        logger.info("%s: %s -> %d images (%d entries)", username, old_counts, count, len(entries))
+        logger.info("%s: %d total images (%d entries)", username, count, len(entries))
     return int(failed)
 
 

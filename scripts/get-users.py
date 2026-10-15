@@ -36,14 +36,19 @@ data = json.load(open(leaderboards_file))
 pattern = re.compile(args.pattern)
 
 users = {}
+totals = {}
 for loc_id, entry in data.items():
     if not pattern.search(entry["name"]):
         continue
     for user_entry in entry["leaderboard"]["lifetime"]:
         username = user_entry["user"]["username"]
         count = user_entry["count"]
+        if "total_count" in user_entry:
+            totals[username] = user_entry["total_count"]
         if username not in users or count > users[username]:
             users[username] = count
+
+users.update(totals)
 
 archived = get_archived_usernames() if args.exclude_archived else set()
 
