@@ -206,3 +206,36 @@ def discover_users(key: str = "global") -> list[tuple[str, int]]:
         [(e["user"]["username"], e["count"]) for e in leaderboard["lifetime"]],
         key=lambda x: x[1],
     )
+
+
+# Match the profile drawer query, including its allowlisted whitespace.
+PROFILE_DOC = "query getData($username: String!) {\n      user_by_username(username: $username) {\n        __typename created_at_seconds description id username stats {\n            distance {\n              km\n              __typename\n            }\n            images\n            __typename\n          }\n      }\n    }"
+
+PROFILE_QUERY = "query getData($username: String!) {\n  user_by_username(username: $username) {\n    __typename\n    created_at_seconds\n    description\n    id\n    username\n    stats {\n      distance {\n        km\n        __typename\n      }\n      images\n      __typename\n    }\n  }\n}"
+
+
+def get_profile_image_count(username: str) -> int:
+    """Return the global image total displayed on a user's web profile.
+
+    Missing users or unavailable totals raise rather than being treated as zero.
+    """
+    resp = requests.get(
+        GRAPHQL_URL,
+        params={
+            "doc": PROFILE_DOC,
+            "query": PROFILE_QUERY,
+            "operationName": "getData",
+            "variables": json.dumps({"username": username}),
+        },
+        headers={"authorization": f"OAuth {get_web_token()}", "content-type": "application/json"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if "errors" in data:
+        raise RuntimeError(f"GraphQL error: {data['errors']}")
+    profile = data.get("data", {}).get("user_by_username")
+    count = (profile.get("stats") or {}).get("images") if profile else None
+    if type(count) is not int or count < 0:
+        raise ValueError(f"No valid profile image total for {username!r}")
+    return count
