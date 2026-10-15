@@ -50,7 +50,6 @@ def tar_date_directory(collection_dir, date_dir):
         return None, 0
 
     file_count = len(files)
-    logger.info(f"Tarring date '{date_name}' ({file_count} files)...")
 
     if _is_gnu_tar():
         ownership_flags = ["--owner=0", "--group=0", "--numeric-owner"]

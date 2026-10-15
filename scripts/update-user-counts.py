@@ -70,7 +70,7 @@ def main(argv=None):
         for entry in entries:
             entry["total_count"] = count
         safe_json_save(filename, data)
-        logger.info("%s: %d total images (%d entries)", username, count, len(entries))
+        logger.info("%s: %d total images", username, count)
     return int(failed)
 
 

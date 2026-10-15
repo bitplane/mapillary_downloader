@@ -459,9 +459,9 @@ class MapillaryDownloader:
                         total_bytes += bytes_dl
                         total_output_bytes += output_bytes
 
-                        # Log every download for first 10, then every 100
+                        # Log the first image, 100, then every 1,000.
                         total_downloaded = len(self.downloaded)
-                        should_log = downloaded_count <= 10 or downloaded_count % 100 == 0
+                        should_log = downloaded_count in (1, 100) or downloaded_count % 1000 == 0
                         if should_log:
                             logger.info(
                                 f"Downloaded: {total_downloaded:,} "
@@ -563,12 +563,13 @@ class MapillaryDownloader:
                     total_bytes += bytes_dl
                     total_output_bytes += output_bytes
 
-                    if downloaded_count % 100 == 0:
+                    if downloaded_count in (1, 100) or downloaded_count % 1000 == 0:
                         logger.info(
                             f"Downloaded: {len(self.downloaded):,} "
                             f"({format_size(total_bytes)} this session, "
                             f"{format_size(self.baseline_bytes + total_bytes)} total)"
                         )
+                    if downloaded_count % 100 == 0:
                         pool.check_throughput(downloaded_count)
                         # Save progress every 5 minutes
                         if time.time() - self._last_save_time >= 300:
