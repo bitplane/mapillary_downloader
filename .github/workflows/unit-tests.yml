@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libimage-exiftool-perl webp
       - name: Build dev environment
         run: make dev
       - name: Unit tests
