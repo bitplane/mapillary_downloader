@@ -103,7 +103,9 @@ class AdaptiveWorkerPool:
         self.last_processed = total_processed
         self.last_check_time = now
 
-        logger.info(f"Throughput: {throughput:.1f} items/s (workers: {current_workers}/{self.max_workers})")
+        # Match download progress milestones without reducing adjustment frequency.
+        log_throughput = logger.info if total_processed in (1, 100) or total_processed % 1000 == 0 else logger.debug
+        log_throughput(f"Throughput: {throughput:.1f} items/s (workers: {current_workers}/{self.max_workers})")
 
         # Need at least 2 measurements to calculate gain per worker
         if len(self.throughput_history) < 2:
@@ -134,14 +136,8 @@ class AdaptiveWorkerPool:
             f"(gain: {throughput_gain:.1f}, added: {workers_added})"
         )
 
-        # If throughput decreased significantly, stop adding workers
-        if current_throughput < previous_throughput * 0.95:
-            logger.info(
-                f"Throughput decreasing ({current_throughput:.1f} vs {previous_throughput:.1f} items/s), "
-                f"stopping at {current_workers} workers"
-            )
         # If throughput is still increasing or stable, add more workers
-        elif current_throughput >= previous_throughput * 0.95 and current_workers < self.max_workers:
+        if current_throughput >= previous_throughput * 0.95 and current_workers < self.max_workers:
             if workers_added > 0 and throughput_gain > 0:
                 # Calculate gain per worker
                 gain_per_worker = throughput_gain / workers_added
