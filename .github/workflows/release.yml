@@ -8,6 +8,9 @@ on:
 jobs:
   release:
 
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +30,9 @@ jobs:
         run: make test
       - name: Build distribution
         run: make dist
-      - name: Push release
-        env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: make release
+      - name: Verify release version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          test "$GITHUB_REF_NAME" = "$version"
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
