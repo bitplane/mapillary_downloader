@@ -339,3 +339,42 @@ def test_tar_content_roundtrip(tmp_path):
             member_path = f"2024-06-01/seq_roundtrip/{name}"
             extracted = tar.extractfile(member_path).read()
             assert extracted == expected, f"{name}: content mismatch"
+
+
+def test_tar_retries_interrupted_partial(tmp_path):
+    collection = tmp_path / "collection"
+    date_dir = collection / "2024-01-15"
+    date_dir.mkdir(parents=True)
+    (date_dir / "image.webp").write_bytes(b"image data")
+    partial = collection / "2024-01-15.tar.partial"
+    partial.write_bytes(b"interrupted tar")
+
+    assert tar_sequence_directories(collection) == (1, 1)
+
+    assert not partial.exists()
+    assert not date_dir.exists()
+    with tarfile.open(collection / "2024-01-15.tar") as archive:
+        assert archive.extractfile("2024-01-15/image.webp").read() == b"image data"
+
+
+def test_tar_failure_keeps_sources_for_retry(tmp_path):
+    from unittest.mock import Mock, patch
+
+    import pytest
+
+    date_dir = tmp_path / "2024-01-15"
+    date_dir.mkdir()
+    source = date_dir / "image.webp"
+    source.write_bytes(b"image data")
+    with (
+        patch("mapillary_downloader.tar_sequences._is_gnu_tar", return_value=True),
+        patch(
+            "mapillary_downloader.tar_sequences.subprocess.run", return_value=Mock(returncode=1, stderr=b"disk full")
+        ),
+        pytest.raises(RuntimeError, match="disk full"),
+    ):
+        tar_sequence_directories(tmp_path)
+    assert source.read_bytes() == b"image data"
+    assert not (tmp_path / "2024-01-15.tar").exists()
+
+    assert tar_sequence_directories(tmp_path) == (1, 1)

@@ -117,9 +117,10 @@ def finalize_collection(
     work_dir = staging_dir
     if staging_dir.name != final_dir.name:
         work_dir = staging_dir.parent / final_dir.name
-        if work_dir.exists():
-            raise FileExistsError(f"Finalization work directory already exists and needs repair: {work_dir}")
-        shutil.move(str(staging_dir), str(work_dir))
+        if not work_dir.exists():
+            shutil.move(str(staging_dir), str(work_dir))
+        else:
+            logger.info("Resuming finalization in %s", work_dir)
 
     if state_dir and include_master_state:
         copy_master_state(state_dir, work_dir)

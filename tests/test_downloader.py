@@ -538,6 +538,62 @@ def test_chunked_manifest_reconciles_finalizing_output(tmp_path):
     assert FakeWorkerPool.instances == []
 
 
+@pytest.mark.parametrize("is_final", [False, True])
+def test_chunked_manifest_resumes_interrupted_finalization(tmp_path, is_final):
+    """Resume the renamed payload without starting download workers."""
+    FakeWorkerPool.instances = []
+    mock_client = Mock()
+    mock_client.access_token = "test-token"
+    staging_dir = tmp_path / "cache" / "mapillary-testuser-original"
+    staging_dir.mkdir(parents=True)
+    output_dir = tmp_path / "output" / "mapillary-testuser-original"
+    work_dir = staging_dir / output_dir.name
+    work_dir.mkdir()
+    (work_dir / "saved-image").write_bytes(b"downloaded data")
+    (staging_dir / "chunks.json").write_text(
+        json.dumps(
+            {
+                "mode": "chunked",
+                "params": {"username": "testuser", "quality": "original", "is_webp": False, "bbox": None},
+                "limits": {"max_size_bytes": 1, "max_images": None},
+                "next_chunk": 1,
+                "finalizing": {"name": "mapillary-testuser-original", "images": 7, "bytes": 456, "final": is_final},
+                "completed": [],
+            }
+        )
+    )
+
+    with (
+        patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path / "cache"),
+        patch("mapillary_downloader.downloader.AdaptiveWorkerPool", FakeWorkerPool),
+    ):
+        downloader = MapillaryDownloader(
+            mock_client,
+            tmp_path / "output",
+            username="testuser",
+            quality="original",
+            check_ia=False,
+            tar_sequences=False,
+            limits=DownloadLimits(max_size_bytes=1, min_free_space_bytes=None),
+        )
+        if is_final:
+            downloader.download_user_data()
+        else:
+            downloader._init_chunk_manifest(None)
+            assert downloader.chunk_manifest.next_chunk == 2
+            downloader._close_file_handler()
+
+    manifest = json.loads((staging_dir / "chunks.json").read_text())
+    assert manifest["completed"] == [
+        {"name": "mapillary-testuser-original", "images": 7, "bytes": 456, "final": is_final}
+    ]
+    assert "finalizing" not in manifest
+    assert FakeWorkerPool.instances == []
+
+    assert (output_dir / "saved-image").read_bytes() == b"downloaded data"
+    assert not work_dir.exists()
+
+
 def test_baseline_bytes_counts_existing_payload_files(tmp_path):
     mock_client = Mock()
     with patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path / "cache"):

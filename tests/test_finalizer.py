@@ -2,7 +2,6 @@
 
 import gzip
 import json
-import pytest
 
 from mapillary_downloader import paths
 from mapillary_downloader.finalizer import compress_metadata, finalize_collection
@@ -43,20 +42,23 @@ def test_finalize_chunk_payload_uses_final_name_for_metadata(tmp_path):
     assert not payload_dir.exists()
 
 
-def test_finalize_refuses_existing_partial_dir(tmp_path):
+def test_finalize_resumes_existing_work_dir(tmp_path):
     payload_dir = tmp_path / "cache" / "mapillary-testuser-original" / paths.PAYLOAD_DIR
     payload_dir.mkdir(parents=True)
     work_dir = payload_dir.parent / "mapillary-testuser-original-2"
     work_dir.mkdir()
 
-    with pytest.raises(FileExistsError):
-        finalize_collection(
-            payload_dir,
-            tmp_path / "output" / "mapillary-testuser-original-2",
-            convert_webp=False,
-            tar_sequences=False,
-            include_master_state=False,
-        )
+    (work_dir / "saved-image").write_bytes(b"downloaded data")
+    final_dir = tmp_path / "output" / "mapillary-testuser-original-2"
+    finalize_collection(
+        payload_dir,
+        final_dir,
+        convert_webp=False,
+        tar_sequences=False,
+        include_master_state=False,
+    )
+    assert (final_dir / "saved-image").read_bytes() == b"downloaded data"
+    assert not work_dir.exists()
 
 
 def test_intermediate_chunk_metadata_has_archive_tags_without_count(tmp_path):

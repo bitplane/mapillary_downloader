@@ -28,11 +28,12 @@ def tar_date_directory(collection_dir, date_dir):
         date_dir: Path to date directory to tar
 
     Returns:
-        Tuple of (tar_path, file_count) on success, or (None, 0) on failure
+        Tuple of (tar_path, file_count) on success, or (None, 0) for an empty directory.
+        Raises RuntimeError if tar fails, leaving source files available for retry.
     """
     date_name = date_dir.name
 
-    # Find next available tar filename (don't overwrite existing tars)
+    # Find next available tar filename (don't overwrite completed tars)
     tar_path = collection_dir / f"{date_name}.tar"
     if tar_path.exists():
         addendum = 1
@@ -56,8 +57,10 @@ def tar_date_directory(collection_dir, date_dir):
     else:
         ownership_flags = ["--uid", "0", "--gid", "0"]
 
+    # Publish only complete archives; retry overwrites an interrupted .partial.
+    partial_path = tar_path.with_suffix(".tar.partial")
     result = subprocess.run(
-        ["tar", "cf", str(tar_path)] + ownership_flags + ["-T", "-"],
+        ["tar", "cf", str(partial_path)] + ownership_flags + ["-T", "-"],
         input="\n".join(files).encode(),
         cwd=collection_dir,
         capture_output=True,
@@ -65,15 +68,15 @@ def tar_date_directory(collection_dir, date_dir):
 
     if result.returncode != 0:
         logger.error(f"tar failed for {date_name}: {result.stderr.decode()}")
-        if tar_path.exists():
-            tar_path.unlink()
-        return None, 0
+        partial_path.unlink(missing_ok=True)
+        raise RuntimeError(f"tar failed for {date_name}: {result.stderr.decode()}")
 
-    if not tar_path.exists() or tar_path.stat().st_size == 0:
+    if not partial_path.exists() or partial_path.stat().st_size == 0:
         logger.error(f"Tar file empty or not created: {tar_path}")
-        if tar_path.exists():
-            tar_path.unlink()
-        return None, 0
+        partial_path.unlink(missing_ok=True)
+        raise RuntimeError(f"Tar file empty or not created: {partial_path}")
+
+    partial_path.replace(tar_path)
 
     # Remove original date directory
     shutil.rmtree(date_dir)

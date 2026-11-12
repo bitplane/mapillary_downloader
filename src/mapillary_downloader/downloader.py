@@ -195,6 +195,22 @@ class MapillaryDownloader:
             finalizing_name = finalizing.get("name")
             finalizing_dir = self.base_output_dir / finalizing_name
             work_dir = self.staging_dir / finalizing_name
+            if work_dir.exists() and not finalizing_dir.exists():
+                logger.info("Resuming interrupted finalization for %s", finalizing_name)
+                finalize_collection(
+                    work_dir,
+                    finalizing_dir,
+                    convert_webp=self.convert_webp,
+                    tar_sequences=self.tar_sequences,
+                    state_dir=self.staging_dir,
+                    include_master_state=finalizing.get("final", False),
+                    chunk_title=f"Mapillary images by {self.username} ({finalizing_name})",
+                    chunk_description=(
+                        f"Intermediate Mapillary download chunk {finalizing_name}. "
+                        "Master metadata is kept with the final chunk."
+                    ),
+                    chunk_username=self.username,
+                )
             if finalizing_dir.exists():
                 logger.info("Reconciling completed finalization for %s", finalizing_name)
                 self.chunk_manifest.mark_completed(
@@ -207,8 +223,6 @@ class MapillaryDownloader:
                     self._close_file_handler()
                     self.chunk_manifest = None
                     return None
-            elif work_dir.exists():
-                raise RuntimeError(f"Finalization work directory exists and needs repair: {work_dir}")
             else:
                 self.chunk_manifest.clear_finalizing()
 
