@@ -467,6 +467,9 @@ def test_chunked_download_skips_when_manifest_final(tmp_path):
     mock_client.access_token = "test-token"
     staging_dir = tmp_path / "cache" / "mapillary-testuser-original"
     staging_dir.mkdir(parents=True)
+    for filename in ("metadata.jsonl", "metadata.jsonl.gz", ".api_cursor"):
+        (staging_dir / filename).write_bytes(b"cached metadata")
+    (staging_dir / "progress.json").write_text('{"original": ["img1"]}')
     (staging_dir / "chunks.json").write_text(
         json.dumps(
             {
@@ -495,6 +498,11 @@ def test_chunked_download_skips_when_manifest_final(tmp_path):
 
     assert FakeWorkerPool.instances == []
 
+    for filename in ("metadata.jsonl", "metadata.jsonl.gz", "progress.json", ".api_cursor"):
+        assert not (staging_dir / filename).exists()
+    assert (staging_dir / "chunks.json").exists()
+    mock_client.get_user_images.assert_not_called()
+
 
 def test_chunked_manifest_reconciles_finalizing_output(tmp_path):
     """If a move completed before manifest update, startup should mark it completed."""
@@ -503,6 +511,9 @@ def test_chunked_manifest_reconciles_finalizing_output(tmp_path):
     mock_client.access_token = "test-token"
     staging_dir = tmp_path / "cache" / "mapillary-testuser-original"
     staging_dir.mkdir(parents=True)
+    for filename in ("metadata.jsonl", "metadata.jsonl.gz", ".api_cursor"):
+        (staging_dir / filename).write_bytes(b"cached metadata")
+    (staging_dir / "progress.json").write_text('{"original": ["img1"]}')
     output_dir = tmp_path / "output" / "mapillary-testuser-original"
     output_dir.mkdir(parents=True)
     (staging_dir / "chunks.json").write_text(
@@ -537,6 +548,11 @@ def test_chunked_manifest_reconciles_finalizing_output(tmp_path):
     assert "finalizing" not in manifest
     assert FakeWorkerPool.instances == []
 
+    for filename in ("metadata.jsonl", "metadata.jsonl.gz", "progress.json", ".api_cursor"):
+        assert not (staging_dir / filename).exists()
+    assert (staging_dir / "chunks.json").exists()
+    mock_client.get_user_images.assert_not_called()
+
 
 @pytest.mark.parametrize("is_final", [False, True])
 def test_chunked_manifest_resumes_interrupted_finalization(tmp_path, is_final):
@@ -546,6 +562,9 @@ def test_chunked_manifest_resumes_interrupted_finalization(tmp_path, is_final):
     mock_client.access_token = "test-token"
     staging_dir = tmp_path / "cache" / "mapillary-testuser-original"
     staging_dir.mkdir(parents=True)
+    metadata = json.dumps({"id": "img1", "captured_at": 1700000000000}) + "\n"
+    (staging_dir / "metadata.jsonl").write_text(metadata)
+    (staging_dir / "progress.json").write_text('{"original": ["img1"]}')
     output_dir = tmp_path / "output" / "mapillary-testuser-original"
     work_dir = staging_dir / output_dir.name
     work_dir.mkdir()
@@ -593,6 +612,14 @@ def test_chunked_manifest_resumes_interrupted_finalization(tmp_path, is_final):
     assert (output_dir / "saved-image").read_bytes() == b"downloaded data"
     assert not work_dir.exists()
 
+    assert (staging_dir / "metadata.jsonl").exists() is not is_final
+    assert (staging_dir / "progress.json").exists() is not is_final
+    if is_final:
+        import gzip
+
+        with gzip.open(output_dir / "metadata.jsonl.gz", "rt") as archive:
+            assert archive.read() == metadata
+
 
 def test_baseline_bytes_counts_existing_payload_files(tmp_path):
     mock_client = Mock()
@@ -609,3 +636,51 @@ def test_baseline_bytes_counts_existing_payload_files(tmp_path):
         downloader.baseline_bytes = downloader._baseline_bytes()
 
     assert downloader.baseline_bytes == 5
+
+
+@pytest.mark.parametrize("completion_save_fails", [False, True])
+def test_completed_download_cleans_cache_only_after_manifest_saved(tmp_path, completion_save_fails):
+    from contextlib import nullcontext
+
+    from mapillary_downloader.chunks import ChunkManifest
+
+    mock_client = Mock()
+    mock_client.access_token = "test-token"
+    mock_client.get_user_images.return_value = iter(
+        [{"id": "img1", "captured_at": 1700000000000, "thumb_original_url": "http://example.com/img1.jpg"}]
+    )
+    with (
+        patch("mapillary_downloader.downloader.get_cache_dir", return_value=tmp_path / "cache"),
+        patch("mapillary_downloader.downloader.AdaptiveWorkerPool", FakeWorkerPool),
+    ):
+        downloader = MapillaryDownloader(
+            mock_client,
+            tmp_path / "output",
+            username="testuser",
+            quality="original",
+            tar_sequences=False,
+            check_ia=False,
+            limits=DownloadLimits(max_size_bytes=900_000_000_000, min_free_space_bytes=None),
+        )
+        with (
+            patch.object(ChunkManifest, "mark_completed", side_effect=OSError("save failed"))
+            if completion_save_fails
+            else nullcontext()
+        ):
+            if completion_save_fails:
+                with pytest.raises(OSError, match="save failed"):
+                    downloader.download_user_data()
+            else:
+                downloader.download_user_data()
+
+        assert downloader.metadata_file.exists() == completion_save_fails
+        assert downloader.progress_file.exists() == completion_save_fails
+        assert (downloader.final_dir / "metadata.jsonl.gz").exists()
+        manifest = json.loads(downloader.paths.chunks_file.read_text())
+        assert bool(manifest["completed"]) is not completion_save_fails
+
+        if not completion_save_fails:
+            # Uploading/moving output away must not trigger another download.
+            shutil.rmtree(downloader.final_dir)
+            downloader.download_user_data()
+            assert mock_client.get_user_images.call_count == 1

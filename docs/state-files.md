@@ -17,6 +17,14 @@ path.
 - `__ia_thumb__.jpg` - Internet Archive item thumbnail.
 - `download.log.{timestamp}` - per-run collection log.
 
+After the final chunk has been moved to output and completion saved in
+`chunks.json`, the cache copies of `metadata.jsonl`, `metadata.jsonl.gz`,
+`progress.json`, and `.api_cursor` are removed. The final output retains its
+archival copies. Completed jobs encountered on a later run receive the same
+cleanup. Intermediate chunks and interrupted jobs retain their resume state.
+`chunks.json` stays in the cache to prevent repeat processing until manually
+removed.
+
 ## Discovery Caches
 
 All discovery caches live under the `mapillary_downloader` XDG cache directory.

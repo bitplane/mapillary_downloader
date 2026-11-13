@@ -170,6 +170,12 @@ class MapillaryDownloader:
         usage = shutil.disk_usage(self.staging_dir)
         return usage.free >= self.limits.min_free_space_bytes
 
+    def _clean_completed_cache(self):
+        """Drop per-image state after durable completion; retain the manifest."""
+        for name in (paths.METADATA_JSONL, paths.METADATA_JSONL_GZ, paths.PROGRESS_JSON, paths.API_CURSOR):
+            (self.staging_dir / name).unlink(missing_ok=True)
+        self.downloaded.clear()
+
     def _init_chunk_manifest(self, bbox):
         if not self.chunked:
             return None
@@ -185,6 +191,7 @@ class MapillaryDownloader:
             max_images=self.limits.max_images,
         )
         if self.chunk_manifest.is_complete:
+            self._clean_completed_cache()
             logger.info("Chunked collection already marked complete, skipping download")
             self._close_file_handler()
             self.chunk_manifest = None
@@ -220,6 +227,7 @@ class MapillaryDownloader:
                     final=finalizing.get("final", False),
                 )
                 if finalizing.get("final", False):
+                    self._clean_completed_cache()
                     self._close_file_handler()
                     self.chunk_manifest = None
                     return None
@@ -662,6 +670,7 @@ class MapillaryDownloader:
                 final=is_final,
             )
             if is_final:
+                self._clean_completed_cache()
                 logger.info("Chunked download complete")
             else:
                 self.output_dir.mkdir(parents=True, exist_ok=True)
